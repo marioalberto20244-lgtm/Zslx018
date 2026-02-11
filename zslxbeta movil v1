@@ -507,11 +507,15 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
---// MOTOR FLY SUPERMAN 360° (MÓVIL WASD STYLE)
+--// MOTOR FLY MÓVIL (BYPASS FÍSICO - NO ATRAVIESA)
 task.spawn(function()
     local p = game.Players.LocalPlayer
     local runService = game:GetService("RunService")
+    local staticY = 0
     local active = false
+
+    -- Accedemos al control nativo del Joystick (Lo más estable en móvil)
+    local PlayerControl = require(p.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
 
     runService.Stepped:Connect(function()
         local char = p.Character
@@ -519,12 +523,16 @@ task.spawn(function()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
 
         if _G.Prueba_Enabled and hrp and hum then
-            active = true
+            if not active then
+                staticY = hrp.Position.Y
+                active = true
+            end
 
             hum:ChangeState(Enum.HumanoidStateType.Physics)
             hum.PlatformStand = true
             
-            -- FIX: COLISIONES (Bypass físico)
+            -- FIX COLISIONES: Aquí nos aseguramos de que SÍ choque
+            -- Solo se apagan si tú activas el Noclip aparte
             local canCollideState = not (_G.Noclip_Enabled or false)
             for _, part in pairs(char:GetChildren()) do
                 if part:IsA("BasePart") then 
@@ -532,31 +540,30 @@ task.spawn(function()
                 end
             end
             
-            local cam = workspace.CurrentCamera.CFrame
-            local speed = (_G.Pruebax_Size or 16) * 5
+            local cam = workspace.CurrentCamera
+            local speed = (_G.Pruebax_Size or 16) * 5 -- Multiplicador para el bypass
             
-            -- OBTENER MOVIMIENTO DEL JOYSTICK (Relativo a la cámara)
-            local moveDir = hum.MoveDirection
+            -- Pose parada mirando a la cámara
+            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.CFrame.LookVector)
             
-            if moveDir.Magnitude > 0 then
-                -- ESTA ES LA MAGIA:
-                -- Usamos el LookVector de la cámara pero multiplicado por la dirección del joystick
-                -- Así si mueves atrás, la velocidad es negativa respecto al frente de la cámara.
+            -- OBTENER MOVIMIENTO DEL JOYSTICK
+            local moveVector = PlayerControl:GetMoveVector()
+            
+            if moveVector.Magnitude > 0 then
+                local camCFrame = cam.CFrame
+                -- Calculamos la dirección real (Adelante/Atrás + Lados + Inclinación Cámara)
+                local direction = (camCFrame.LookVector * -moveVector.Z) + (camCFrame.RightVector * moveVector.X)
                 
-                local finalVelocity = moveDir * speed
-                
-                -- Si quieres que al mirar arriba y dar "adelante" suba, usamos esto:
-                if moveDir.Magnitude > 0 then
-                    -- Calculamos la dirección del vuelo basada en el Joystick + Inclinación de cámara
-                    hrp.AssemblyLinearVelocity = moveDir * speed + Vector3.new(0, cam.LookVector.Y * (moveDir.Magnitude * speed), 0)
-                end
+                -- BYPASS FÍSICO: Usamos Velocity para que el motor del juego detecte paredes
+                hrp.AssemblyLinearVelocity = direction * speed
+                staticY = hrp.Position.Y 
             else
-                -- FRENADO TOTAL
+                -- CONGELACIÓN TOTAL (Frenado seco)
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                hrp.CFrame = CFrame.new(hrp.Position.X, staticY, hrp.Position.Z) * hrp.CFrame.Rotation
             end
             
-            -- POSE: El mono siempre ve a donde ve la cámara, pero se mueve para todos lados
-            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.LookVector)
+            -- Bypass de rotación para evitar kick
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
             if active then
