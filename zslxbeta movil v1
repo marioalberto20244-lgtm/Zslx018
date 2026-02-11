@@ -507,14 +507,12 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
---// MOTOR FLY MÓVIL (BYPASS FÍSICO - NO ATRAVIESA)
+--// MOTOR FLY MÓVIL (FIX DIRECCIÓN INVERSA)
 task.spawn(function()
     local p = game.Players.LocalPlayer
     local runService = game:GetService("RunService")
     local staticY = 0
     local active = false
-
-    -- Accedemos al control nativo del Joystick (Lo más estable en móvil)
     local PlayerControl = require(p.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
 
     runService.Stepped:Connect(function()
@@ -531,39 +529,40 @@ task.spawn(function()
             hum:ChangeState(Enum.HumanoidStateType.Physics)
             hum.PlatformStand = true
             
-            -- FIX COLISIONES: Aquí nos aseguramos de que SÍ choque
-            -- Solo se apagan si tú activas el Noclip aparte
             local canCollideState = not (_G.Noclip_Enabled or false)
             for _, part in pairs(char:GetChildren()) do
-                if part:IsA("BasePart") then 
-                    part.CanCollide = canCollideState 
-                end
+                if part:IsA("BasePart") then part.CanCollide = canCollideState end
             end
             
             local cam = workspace.CurrentCamera
-            local speed = (_G.Pruebax_Size or 16) * 5 -- Multiplicador para el bypass
-            
-            -- Pose parada mirando a la cámara
-            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.CFrame.LookVector)
+            local speed = (_G.Pruebax_Size or 16) * 5
             
             -- OBTENER MOVIMIENTO DEL JOYSTICK
             local moveVector = PlayerControl:GetMoveVector()
             
             if moveVector.Magnitude > 0 then
-                local camCFrame = cam.CFrame
-                -- Calculamos la dirección real (Adelante/Atrás + Lados + Inclinación Cámara)
-                local direction = (camCFrame.LookVector * -moveVector.Z) + (camCFrame.RightVector * moveVector.X)
+                local camCF = cam.CFrame
                 
-                -- BYPASS FÍSICO: Usamos Velocity para que el motor del juego detecte paredes
+                -- LA CORRECCIÓN:
+                -- Calculamos el frente y el lado basándonos en la cámara
+                local look = camCF.LookVector
+                local right = camCF.RightVector
+                
+                -- MoveVector.Z es adelante/atrás, MoveVector.X es izquierda/derecha
+                -- Multiplicamos cada eje por su dirección correspondiente
+                local direction = (look * -moveVector.Z) + (right * moveVector.X)
+                
+                -- Aplicamos la velocidad física
                 hrp.AssemblyLinearVelocity = direction * speed
                 staticY = hrp.Position.Y 
             else
-                -- CONGELACIÓN TOTAL (Frenado seco)
+                -- FRENADO SECO
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 hrp.CFrame = CFrame.new(hrp.Position.X, staticY, hrp.Position.Z) * hrp.CFrame.Rotation
             end
             
-            -- Bypass de rotación para evitar kick
+            -- POSE SIEMPRE DERECHO
+            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.CFrame.LookVector)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
             if active then
@@ -572,6 +571,7 @@ task.spawn(function()
                     hum.PlatformStand = false
                     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
                 end
+                -- Resetear colisiones al apagar
                 if char then
                     for _, part in pairs(char:GetChildren()) do
                         if part:IsA("BasePart") then part.CanCollide = true end
