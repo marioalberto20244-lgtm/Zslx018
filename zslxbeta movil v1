@@ -1376,14 +1376,14 @@ SpeedButton:AddSubInput("Velocidad", 16, 1, 200, function(v)
     _G.Speed_Value = v
 end)
 
---// BOTONES DE FOV EN EL MENÚ //--
-local SeccionFOV = PruebaMenu:AddSubToggle("Fov", function(v)
-    _G.FOV_Enabled = v -- Conecta con el cerebro
+--// SECCIÓN DE VISTA FOV PERSONALIZADA //--
+local FOVMenu = Zslx:Toggle("Vista FOV+", function(v)
+    _G.FOV_Enabled = v
 end)
 
--- El Sub-Botón que sale al picar el "+"
-SeccionFOV:AddSubInput("Rango (1-120)", 70, 1, 120, function(v)
-    _G.FOV_Value = v -- Ajusta el valor del cerebro
+-- Sub-Input para el rango (Igual al de Velocidad)
+FOVMenu:AddSubInput("Rango (1-120)", 70, 1, 120, function(v)
+    _G.FOV_Value = v
 end)
 
 ----------------------------------------------------
