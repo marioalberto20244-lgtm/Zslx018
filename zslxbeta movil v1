@@ -507,11 +507,10 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
---// MOTOR FLY PARADO FLEXIBLE (BYPASS FÍSICO REAL - NO TRANSPASA)
+--// MOTOR FLY PARADO FLEXIBLE (VERSIÓN MÓVIL OPTIMIZADA)
 task.spawn(function()
     local p = game.Players.LocalPlayer
     local runService = game:GetService("RunService")
-    local uis = game:GetService("UserInputService")
     local staticY = 0
     local active = false
 
@@ -529,8 +528,7 @@ task.spawn(function()
             hum:ChangeState(Enum.HumanoidStateType.Physics)
             hum.PlatformStand = true
             
-            -- FIX: COLISIONES ACTIVAS (Para que NO atraviese paredes)
-            -- Si quieres atravesar, usa el botón de Noclip que te pasé antes
+            -- FIX: COLISIONES ACTIVAS
             local canCollideState = not (_G.Noclip_Enabled or false)
             for _, part in pairs(char:GetChildren()) do
                 if part:IsA("BasePart") then 
@@ -539,35 +537,24 @@ task.spawn(function()
             end
             
             local cam = workspace.CurrentCamera.CFrame
-            -- Multiplicador x5 integrado para potencia pura
             local speed = (_G.Pruebax_Size or 16) * 5
             
-            -- POSE PARADO FLEXIBLE: Respeta tu línea original
+            -- POSE PARADO: Siempre mirando al frente de la cámara
             hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.LookVector)
             
-            -- MOVIMIENTO
-            local moveDir = Vector3.new(0,0,0)
-            local look = cam.LookVector
-            local right = cam.RightVector
-            
-            if uis:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + look end
-            if uis:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - look end
-            if uis:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right end
-            if uis:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right end
+            -- MOVIMIENTO MÓVIL (Usa el Joystick del cel)
+            local moveDir = hum.MoveDirection -- ESTO ES LO QUE HACE QUE FUNCIONE EN CEL, WE
             
             if moveDir.Magnitude > 0 then
-                -- BYPASS FÍSICO SECO (LinearVelocity):
-                -- Al usar AssemblyLinearVelocity el mono CHOCA con todo.
-                hrp.AssemblyLinearVelocity = moveDir.Unit * speed
+                -- Si mueves el joystick, aplicamos velocidad
+                hrp.AssemblyLinearVelocity = moveDir * speed
                 staticY = hrp.Position.Y 
             else
-                -- CONGELACIÓN TOTAL: Respeta tu lógica de staticY
-                -- Frenado seco para eliminar el rebote de W-W-W
+                -- FRENADO SECO (Para que no flote a la deriva)
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 hrp.CFrame = CFrame.new(hrp.Position.X, staticY, hrp.Position.Z) * hrp.CFrame.Rotation
             end
             
-            -- BYPASS ROTACIÓN: Para que no te kickee el server
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
             if active then
