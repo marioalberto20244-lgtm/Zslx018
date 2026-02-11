@@ -1348,7 +1348,7 @@ Settings:Input("ESPACIADO", globalPadding, 0, 50, function(v) globalPadding = v;
 Zslx:Tag("Secion (Fly)")
 
 --// BOTÓN FLY SUPERMAN CON NOCLIP SUB-TOGGLE
-local PruebaMenu = Zslx:Toggle("Fly Superman Fixed", function(v)
+local PruebaMenu = Zslx:Toggle("Fly Fixed", function(v)
     _G.Prueba_Enabled = v
 end)
 
