@@ -507,11 +507,10 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
---// MOTOR FLY PARADO FLEXIBLE (VERSIÓN MÓVIL OPTIMIZADA)
+--// MOTOR FLY SUPERMAN DIRECCIONAL (MÓVIL TOTAL)
 task.spawn(function()
     local p = game.Players.LocalPlayer
     local runService = game:GetService("RunService")
-    local staticY = 0
     local active = false
 
     runService.Stepped:Connect(function()
@@ -520,15 +519,12 @@ task.spawn(function()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
 
         if _G.Prueba_Enabled and hrp and hum then
-            if not active then
-                staticY = hrp.Position.Y
-                active = true
-            end
+            active = true
 
             hum:ChangeState(Enum.HumanoidStateType.Physics)
             hum.PlatformStand = true
             
-            -- FIX: COLISIONES ACTIVAS
+            -- FIX: COLISIONES (Bypass físico)
             local canCollideState = not (_G.Noclip_Enabled or false)
             for _, part in pairs(char:GetChildren()) do
                 if part:IsA("BasePart") then 
@@ -539,22 +535,25 @@ task.spawn(function()
             local cam = workspace.CurrentCamera.CFrame
             local speed = (_G.Pruebax_Size or 16) * 5
             
-            -- POSE PARADO: Siempre mirando al frente de la cámara
-            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.LookVector)
-            
-            -- MOVIMIENTO MÓVIL (Usa el Joystick del cel)
-            local moveDir = hum.MoveDirection -- ESTO ES LO QUE HACE QUE FUNCIONE EN CEL, WE
+            -- MOVIMIENTO MÓVIL DIRECCIONAL
+            local moveDir = hum.MoveDirection
             
             if moveDir.Magnitude > 0 then
-                -- Si mueves el joystick, aplicamos velocidad
-                hrp.AssemblyLinearVelocity = moveDir * speed
-                staticY = hrp.Position.Y 
+                -- EL TRUCO: Multiplicamos el Joystick por la rotación de la cámara para subir/bajar
+                local flyingDir = cam:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z))
+                
+                -- Ajustamos para que siga exactamente la inclinación de la cámara (LookVector)
+                local finalVelocity = (cam.LookVector * (moveDir.Magnitude))
+                
+                -- Aplicamos la potencia x5
+                hrp.AssemblyLinearVelocity = finalVelocity * speed
             else
-                -- FRENADO SECO (Para que no flote a la deriva)
+                -- FRENADO SECO: Si sueltas el joystick, te quedas tieso en el aire
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                hrp.CFrame = CFrame.new(hrp.Position.X, staticY, hrp.Position.Z) * hrp.CFrame.Rotation
             end
             
+            -- POSE: Siempre mirando a donde apunta la cámara
+            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.LookVector)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
             if active then
