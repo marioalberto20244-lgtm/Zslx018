@@ -507,7 +507,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
---// MOTOR FLY SUPERMAN DIRECCIONAL (MÓVIL TOTAL)
+--// MOTOR FLY SUPERMAN 360° (MÓVIL WASD STYLE)
 task.spawn(function()
     local p = game.Players.LocalPlayer
     local runService = game:GetService("RunService")
@@ -535,24 +535,27 @@ task.spawn(function()
             local cam = workspace.CurrentCamera.CFrame
             local speed = (_G.Pruebax_Size or 16) * 5
             
-            -- MOVIMIENTO MÓVIL DIRECCIONAL
+            -- OBTENER MOVIMIENTO DEL JOYSTICK (Relativo a la cámara)
             local moveDir = hum.MoveDirection
             
             if moveDir.Magnitude > 0 then
-                -- EL TRUCO: Multiplicamos el Joystick por la rotación de la cámara para subir/bajar
-                local flyingDir = cam:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z))
+                -- ESTA ES LA MAGIA:
+                -- Usamos el LookVector de la cámara pero multiplicado por la dirección del joystick
+                -- Así si mueves atrás, la velocidad es negativa respecto al frente de la cámara.
                 
-                -- Ajustamos para que siga exactamente la inclinación de la cámara (LookVector)
-                local finalVelocity = (cam.LookVector * (moveDir.Magnitude))
+                local finalVelocity = moveDir * speed
                 
-                -- Aplicamos la potencia x5
-                hrp.AssemblyLinearVelocity = finalVelocity * speed
+                -- Si quieres que al mirar arriba y dar "adelante" suba, usamos esto:
+                if moveDir.Magnitude > 0 then
+                    -- Calculamos la dirección del vuelo basada en el Joystick + Inclinación de cámara
+                    hrp.AssemblyLinearVelocity = moveDir * speed + Vector3.new(0, cam.LookVector.Y * (moveDir.Magnitude * speed), 0)
+                end
             else
-                -- FRENADO SECO: Si sueltas el joystick, te quedas tieso en el aire
+                -- FRENADO TOTAL
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             end
             
-            -- POSE: Siempre mirando a donde apunta la cámara
+            -- POSE: El mono siempre ve a donde ve la cámara, pero se mueve para todos lados
             hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cam.LookVector)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
