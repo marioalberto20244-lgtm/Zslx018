@@ -170,10 +170,10 @@ local function Start(mode)
     -- // EJECUCIÓN DEL SCRIPT FINAL // --
     if mode == "PC" then
         -- Carga tu script de GitHub al terminar
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/marioalberto20244-lgtm/Zslx018/refs/heads/main/zslxbeta%20PC%20v1"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/ajslod%20pc"))()
     elseif mode == "MOBILE" then
         -- Puedes poner el mismo o uno diferente aquí
-       loadstring(game:HttpGet("https://raw.githubusercontent.com/marioalberto20244-lgtm/Zslx018/refs/heads/main/zslxbeta%20movil%20v1"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/fhsf%20movil"))()
     end
     
     -- Limpieza total
