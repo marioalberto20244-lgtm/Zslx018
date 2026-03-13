@@ -343,45 +343,20 @@ local FarmTab = Window:Tab({
 -- Botones -- Combat --
 
 
--- Variable para guardar lo que eliges en la lista y si el botón está prendido
-local ModoElegido = "Auto"
-local SwitchPrendido = false
-
--- Esta función hace que todo se actualice EN CORTO
-local function ActualizarEnCorto()
-    if SwitchPrendido then
-        if ModoElegido == "Auto" then
-            getgenv().AutoShoot_Active = true
-            getgenv().ManualShoot_Active = false
-        elseif ModoElegido == "Manual" then
-            getgenv().AutoShoot_Active = false
-            getgenv().ManualShoot_Active = true
-        end
-    else
-        -- Si apagas el botón, se apagan los dos de golpe
-        getgenv().AutoShoot_Active = false
-        getgenv().ManualShoot_Active = false
-    end
-end
-
--- 1. LA LISTA (Dropdown)
-CombatTab:Dropdown({
-    Title = "Modo de Disparo ⚙️",
-    Desc = "Auto (Solo de frente) | Manual (Tap/Wallbang)",
-    Values = {"Auto", "Manual"},
-    Value = "Auto", -- Valor por defecto
-    Callback = function(valor)
-        ModoElegido = valor
-        ActualizarEnCorto() -- Si cambias de opción, se actualiza en chinga
+CombatTab:Toggle({
+    Title = "Auto Kill Murderer 🎯",
+    Desc = "Dispara solo si lo tienes de frente (Usa Wallcheck).",
+    Callback = function(v) 
+        getgenv().AutoShoot_Active = v 
+        if v then getgenv().ManualShoot_Active = false end -- Apaga el manual si prendes el auto
     end
 })
 
--- 2. EL BOTÓN MAESTRO (Toggle)
 CombatTab:Toggle({
-    Title = "Activar Disparo Asesino 🎯",
-    Desc = "Prende o apaga el modo que elegiste arriba.",
-    Callback = function(estado) 
-        SwitchPrendido = estado
-        ActualizarEnCorto() -- Prende la maquinaria al instante
+    Title = "Manual Kill (Click/Tap) 👆",
+    Desc = "Da click en la pantalla para dispararle (Wallbang/Atraviesa todo).",
+    Callback = function(v) 
+        getgenv().ManualShoot_Active = v 
+        if v then getgenv().AutoShoot_Active = false end -- Apaga el auto si prendes el manual
     end
 })
