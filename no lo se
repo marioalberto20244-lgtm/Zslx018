@@ -345,19 +345,38 @@ local FarmTab = Window:Tab({
 
 
 CombatTab:Toggle({
-    Title = "Auto Kill Murderer 🎯",
-    Desc = "Dispara solo si lo tienes de frente (Usa Wallcheck).",
+    Title = "Auto Kill Murderer 🤖",
+    Desc = "Dispara solo si lo tiene de frente (Wallcheck).",
     Callback = function(v) 
         getgenv().AutoShoot_Active = v 
-        if v then getgenv().ManualShoot_Active = false end -- Apaga el manual si prendes el auto
+        if v then 
+            getgenv().ManualShoot_Wallbang = false 
+            getgenv().ManualShoot_Legit = false 
+        end
     end
 })
 
 CombatTab:Toggle({
-    Title = "Manual Kill (Click/Tap) 👆",
-    Desc = "Da click en la pantalla para dispararle (Wallbang/Atraviesa todo).",
+    Title = "Manual Kill (Wallbang) 🧱",
+    Desc = "Click para disparar: Atraviesa paredes (No Wallcheck).",
     Callback = function(v) 
-        getgenv().ManualShoot_Active = v 
-        if v then getgenv().AutoShoot_Active = false end -- Apaga el auto si prendes el manual
+        getgenv().ManualShoot_Wallbang = v 
+        if v then 
+            getgenv().AutoShoot_Active = false 
+            getgenv().ManualShoot_Legit = false 
+        end
     end
 })
+
+CombatTab:Toggle({
+    Title = "Manual Kill (Legit) 👁️",
+    Desc = "Click para disparar: NO atraviesa paredes (Usa Wallcheck).",
+    Callback = function(v) 
+        getgenv().ManualShoot_Legit = v 
+        if v then 
+            getgenv().AutoShoot_Active = false 
+            getgenv().ManualShoot_Wallbang = false 
+        end
+    end
+})
+
