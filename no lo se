@@ -345,13 +345,15 @@ local FarmTab = Window:Tab({
 
 
 
--- Variable para guardar lo que eliges en la lista y si el botón está prendido
+-- Variables para guardar lo que eliges en las listas y si el botón está prendido
 local ModoElegido = "Auto"
+local TipoBala = "VIP" -- Nueva variable para el tipo de disparo
 local SwitchPrendido = false
 
 -- Esta función hace que todo se actualice EN CORTO
 local function ActualizarEnCorto()
     if SwitchPrendido then
+        -- 1. Actualiza el modo (Auto o Manual)
         if ModoElegido == "Auto" then
             getgenv().AutoShoot_Active = true
             getgenv().ManualShoot_Active = false
@@ -359,29 +361,44 @@ local function ActualizarEnCorto()
             getgenv().AutoShoot_Active = false
             getgenv().ManualShoot_Active = true
         end
+        
+        -- 2. Actualiza el tipo de bala (Normal o VIP)
+        getgenv().Shoot_Type = TipoBala
     else
-        -- Si apagas el botón, se apagan los dos de golpe
+        -- Si apagas el botón, se apaga el gatillo de golpe
         getgenv().AutoShoot_Active = false
         getgenv().ManualShoot_Active = false
     end
 end
 
--- 1. LA LISTA (Dropdown)
+-- 1. PRIMERA LISTA (Auto o Manual)
 CombatTab:Dropdown({
     Title = "Modo de Disparo ⚙️",
-    Desc = "Auto (Solo de frente) | Manual (Tap/Wallbang)",
+    Desc = "Auto (Solo de frente) | Manual (Click/Tap)",
     Values = {"Auto", "Manual"},
     Value = "Auto", -- Valor por defecto
     Callback = function(valor)
         ModoElegido = valor
-        ActualizarEnCorto() -- Si cambias de opción, se actualiza en chinga
+        ActualizarEnCorto() -- Actualiza en chinga
     end
 })
 
--- 2. EL BOTÓN MAESTRO (Toggle)
+-- 2. SEGUNDA LISTA (Normal o VIP) <-- ¡LA NUEVA, WEY!
+CombatTab:Dropdown({
+    Title = "Tipo de Bala ☄️",
+    Desc = "Normal (Ves la bala viajar) | VIP (Wallbang/Teleport a la cabeza)",
+    Values = {"Normal", "VIP"},
+    Value = "VIP", -- Valor por defecto
+    Callback = function(valor)
+        TipoBala = valor
+        ActualizarEnCorto() -- Actualiza en chinga
+    end
+})
+
+-- 3. EL BOTÓN MAESTRO (Toggle)
 CombatTab:Toggle({
     Title = "Activar Disparo Asesino 🎯",
-    Desc = "Prende o apaga el modo que elegiste arriba.",
+    Desc = "Prende o apaga el sistema con las opciones de arriba.",
     Callback = function(estado) 
         SwitchPrendido = estado
         ActualizarEnCorto() -- Prende la maquinaria al instante
