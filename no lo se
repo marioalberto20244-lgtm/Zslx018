@@ -21,11 +21,10 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
-getgenv().Shoot_Type = "VIP" -- Variable del nuevo menú (Normal o VIP)
+getgenv().Shoot_Type = "VIP" -- LA NUEVA VARIABLE (Puede ser "Normal" o "VIP")
 getgenv().CurrentTarget = nil 
 getgenv().RoleCache = {}
 
@@ -47,24 +46,12 @@ task.spawn(function()
     end)
 end)
 
--- // 3. BUSCADOR INTELIGENTE (DOBLE CHECK: CACHE + VISUAL) // --
+-- // 3. BUSCADOR INTELIGENTE (ACTUALIZA EL TARGET POR FUERA) // --
 local function GetMurderer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local esAsesino = false
-            
-            -- CHECK 1: La mente del servidor
+            -- Solo buscamos por la mente del server (Cero líneas, cero cuchillos visuales)
             if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
-                esAsesino = true
-            end
-            
-            -- CHECK 2: Visual (Por si el servidor se apendeja y no avisa)
-            if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then
-                esAsesino = true
-            end
-
-            -- Si pasó cualquiera de los dos checks, lo marcamos
-            if esAsesino then
                 local hum = p.Character:FindFirstChild("Humanoid")
                 if hum and hum.Health > 0 then
                     return p.Character.HumanoidRootPart
@@ -84,7 +71,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- // 4. 🛠️ FIX MAESTRO: REDIRECCIÓN SILENT AIM Y TIPO DE BALA // --
+-- // 4. 🛠️ FIX MAESTRO: REDIRECCIÓN SILENT AIM (CON NORMAL/VIP) // --
 local mt = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -95,22 +82,25 @@ mt.__namecall = newcclosure(function(self, ...)
 
     if tostring(self) == "Shoot" and method == "FireServer" and (getgenv().AutoShoot_Active or getgenv().ManualShoot_Active) then
         local target = getgenv().CurrentTarget
-        local myChar = LocalPlayer.Character
-        
-        if target and myChar and myChar:FindFirstChild("HumanoidRootPart") then
+        if target then
             local Prediction = 0.175
             local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
             
-            -- LÓGICA DE LA BALA FIXEADA (Sin crashear el anticheat)
+            -- MAGIA AÑADIDA: LÓGICA DE BALA NORMAL VS VIP
             if getgenv().Shoot_Type == "Normal" then
-                -- Usamos el CFrame completo (posición + rotación) para que el juego lo acepte
-                args[1] = myChar.HumanoidRootPart.CFrame
+                -- NORMAL: La bala sale de tu personaje (se ve viajar y no atraviesa mágicamente)
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    args[1] = char.HumanoidRootPart.CFrame
+                else
+                    args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0)) -- Por si acaso
+                end
             else
-                -- Modo VIP: La bala aparece mágicamente arriba del enemigo (Wallbang)
+                -- VIP: Wallbang instantáneo (La bala nace en su cabeza)
                 args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0))
             end
             
-            args[2] = CFrame.new(TargetPos) -- Destino (Frente del Murderer)
+            args[2] = CFrame.new(TargetPos)
             return oldNamecall(self, unpack(args))
         end
     end
@@ -138,7 +128,7 @@ local function IsVisible(targetPart)
     return false
 end
 
--- // 6. SISTEMA DE EJECUCIÓN EXACTO // --
+-- // 6. SISTEMA DE EJECUCIÓN EXACTO (CÓMO EL TUYO) // --
 local isShooting = false
 local function ExecuteKill()
     if isShooting then return end
