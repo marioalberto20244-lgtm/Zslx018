@@ -22,10 +22,10 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-    -- // 1. CONTROLADORES (LOS 3 MODOS) // --
+
+-- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
-getgenv().ManualShoot_Wallbang = false -- El que atraviesa
-getgenv().ManualShoot_Legit = false    -- El que NO atraviesa
+getgenv().ManualShoot_Active = false
 getgenv().CurrentTarget = nil 
 getgenv().RoleCache = {}
 
@@ -36,7 +36,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- // 2. LECTURA DE LA VERDAD ABSOLUTA // --
+-- // 2. LECTURA DE LA VERDAD ABSOLUTA (ROLE CACHE) // --
 task.spawn(function()
     local Remotes = ReplicatedStorage:WaitForChild("Remotes")
     local Gameplay = Remotes:WaitForChild("Gameplay")
@@ -47,10 +47,11 @@ task.spawn(function()
     end)
 end)
 
--- // 3. BUSCADOR EXACTO POR MENTE // --
+-- // 3. BUSCADOR INTELIGENTE (ACTUALIZA EL TARGET POR FUERA) // --
 local function GetMurderer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            -- Solo buscamos por la mente del server (Cero líneas, cero cuchillos visuales)
             if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
                 local hum = p.Character:FindFirstChild("Humanoid")
                 if hum and hum.Health > 0 then
@@ -62,15 +63,16 @@ local function GetMurderer()
     return nil
 end
 
+-- Bucle rápido que actualiza al target sin asfixiar el Hook
 RunService.RenderStepped:Connect(function()
-    if getgenv().AutoShoot_Active or getgenv().ManualShoot_Wallbang or getgenv().ManualShoot_Legit then
+    if getgenv().AutoShoot_Active or getgenv().ManualShoot_Active then
         getgenv().CurrentTarget = GetMurderer()
     else
         getgenv().CurrentTarget = nil
     end
 end)
 
--- // 4. 🛠️ FIX MAESTRO: REDIRECCIÓN SILENT AIM // --
+-- // 4. 🛠️ FIX MAESTRO: REDIRECCIÓN SILENT AIM (HOOK ULTRA LIGERO) // --
 local mt = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -79,7 +81,8 @@ mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
 
-    if tostring(self) == "Shoot" and method == "FireServer" and (getgenv().AutoShoot_Active or getgenv().ManualShoot_Wallbang or getgenv().ManualShoot_Legit) then
+    -- Exactamente como en tu script: Solo lee variables, no hace cálculos pesados
+    if tostring(self) == "Shoot" and method == "FireServer" and (getgenv().AutoShoot_Active or getgenv().ManualShoot_Active) then
         local target = getgenv().CurrentTarget
         if target then
             local Prediction = 0.175
@@ -93,7 +96,7 @@ mt.__namecall = newcclosure(function(self, ...)
 end)
 setreadonly(mt, true)
 
--- // 5. WALLCHECK (PARA EL AUTO Y EL MANUAL LEGIT) // --
+-- // 5. WALLCHECK (PARA EL MODO AUTO) // --
 local function IsVisible(targetPart)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("Head") then return false end
@@ -113,7 +116,7 @@ local function IsVisible(targetPart)
     return false
 end
 
--- // 6. SISTEMA DE EJECUCIÓN // --
+-- // 6. SISTEMA DE EJECUCIÓN EXACTO (CÓMO EL TUYO) // --
 local isShooting = false
 local function ExecuteKill()
     if isShooting then return end
@@ -128,16 +131,19 @@ local function ExecuteKill()
     if gun then
         isShooting = true
         
+        -- 1. EQUIPA
         if gun.Parent ~= char then 
             char.Humanoid:EquipTool(gun) 
-            task.wait(0.12)
+            task.wait(0.12) -- Delay para el server
         end
         
+        -- 2. DISPARA (El hook hace la magia)
         local shoot = gun:FindFirstChild("Shoot")
         if shoot then 
             shoot:FireServer(char.HumanoidRootPart.CFrame, char.HumanoidRootPart.CFrame) 
         end
         
+        -- 3. GUARDA
         task.wait(0.05)
         gun.Parent = backpack
         
@@ -146,12 +152,13 @@ local function ExecuteKill()
     end
 end
 
--- // 7. MODO AUTO // --
+-- // 7. MODO AUTO: BUCLE ASESINO // --
 task.spawn(function()
     while true do
         task.wait(0.1)
         if getgenv().AutoShoot_Active and not isShooting then
             local target = getgenv().CurrentTarget
+            -- Si ya sabemos quién es y lo estamos viendo de frente:
             if target and IsVisible(target) then
                 ExecuteKill()
             end
@@ -159,37 +166,27 @@ task.spawn(function()
     end
 end)
 
--- // 8. 🎯 LOS DOS MODOS MANUALES (GATILLO INTELIGENTE) // --
+-- // 8. MODO MANUAL: GATILLO DE PANTALLA // --
 local TouchStart = 0
 local StartPos = Vector2.new(0,0)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end 
-    -- Se activa el gatillo si CUALQUIERA de los dos modos manuales está prendido
-    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and (getgenv().ManualShoot_Wallbang or getgenv().ManualShoot_Legit) then 
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then 
         TouchStart = tick()
         StartPos = input.Position 
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input, gp)
-    -- Misma validación
-    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and (getgenv().ManualShoot_Wallbang or getgenv().ManualShoot_Legit) then
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then
         local Dur = tick() - TouchStart
         local Dist = (Vector2.new(input.Position.X, input.Position.Y) - Vector2.new(StartPos.X, StartPos.Y)).Magnitude
         
         if Dur < 0.25 and Dist < 20 and not isShooting then 
-            local target = getgenv().CurrentTarget
-            if target then
-                -- Lógica para el modo que NO atraviesa paredes (Legit)
-                if getgenv().ManualShoot_Legit then
-                    if IsVisible(target) then
-                        ExecuteKill() -- Solo dispara si lo ve de frente
-                    end
-                -- Lógica para el modo que SÍ atraviesa paredes (Wallbang)
-                elseif getgenv().ManualShoot_Wallbang then
-                    ExecuteKill() -- Dispara le valga madre donde esté
-                end
+            -- Si es manual, no ocupamos Wallcheck. Si el target existe, tira:
+            if getgenv().CurrentTarget then
+                ExecuteKill() 
             end
         end
     end
