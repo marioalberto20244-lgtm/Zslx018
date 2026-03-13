@@ -22,7 +22,6 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -336,26 +335,30 @@ local FarmTab = Window:Tab({
 
 
 
+
+
+
+
+
 -- Botones -- Combat --
 
 
+-- Variable para guardar lo que eliges en la lista y si el botón está prendido
+local ModoElegido = "Auto"
+local SwitchPrendido = false
 
--- Variables internas para manejar el menú
-local SelectedShootMode = "Auto"
-local IsShootSystemOn = false
-
--- Función para actualizar el cerebro según lo que elijas en el menú
-local function UpdateShootSystem()
-    if IsShootSystemOn then
-        if SelectedShootMode == "Auto" then
+-- Esta función hace que todo se actualice EN CORTO
+local function ActualizarEnCorto()
+    if SwitchPrendido then
+        if ModoElegido == "Auto" then
             getgenv().AutoShoot_Active = true
             getgenv().ManualShoot_Active = false
-        elseif SelectedShootMode == "Manual" then
+        elseif ModoElegido == "Manual" then
             getgenv().AutoShoot_Active = false
             getgenv().ManualShoot_Active = true
         end
     else
-        -- Si apagas el switch principal, se apaga todo
+        -- Si apagas el botón, se apagan los dos de golpe
         getgenv().AutoShoot_Active = false
         getgenv().ManualShoot_Active = false
     end
@@ -363,22 +366,22 @@ end
 
 -- 1. LA LISTA (Dropdown)
 CombatTab:Dropdown({
-    Title = "Shoot Mode",
-    Desc = "Elige cómo quieres reventar al Murderer",
+    Title = "Modo de Disparo ⚙️",
+    Desc = "Auto (Solo de frente) | Manual (Tap/Wallbang)",
     Values = {"Auto", "Manual"},
-    Value = "Auto", -- El valor que sale por defecto
-    Callback = function(value)
-        SelectedShootMode = value
-        UpdateShootSystem() -- Actualiza el script por si cambiaste de modo mientras estaba prendido
+    Value = "Auto", -- Valor por defecto
+    Callback = function(valor)
+        ModoElegido = valor
+        ActualizarEnCorto() -- Si cambias de opción, se actualiza en chinga
     end
 })
 
--- 2. EL INTERRUPTOR GENERAL (Toggle)
+-- 2. EL BOTÓN MAESTRO (Toggle)
 CombatTab:Toggle({
-    Title = "Enable Shoot System 🎯",
-    Desc = "Prende o apaga el modo que elegiste arriba",
-    Callback = function(v) 
-        IsShootSystemOn = v
-        UpdateShootSystem()
+    Title = "Activar Disparo Asesino 🎯",
+    Desc = "Prende o apaga el modo que elegiste arriba.",
+    Callback = function(estado) 
+        SwitchPrendido = estado
+        ActualizarEnCorto() -- Prende la maquinaria al instante
     end
 })
