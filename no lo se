@@ -1,0 +1,332 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris") 
+local Stats = game:GetService("Stats")
+local Workspace = game:GetService("Workspace")
+
+--// 2. VARIABLES DE ENTORNO //--
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
+
+
+
+
+
+
+
+
+
+
+
+-- // 1. CONTROLADORES // --
+getgenv().AutoShoot_Active = false
+getgenv().ManualShoot_Active = false
+getgenv().RoleCache = {}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- // 2. LECTURA DE LA VERDAD ABSOLUTA (ROLE CACHE) // --
+task.spawn(function()
+    local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+    local Gameplay = Remotes:WaitForChild("Gameplay")
+    local RoleEvent = Gameplay:WaitForChild("PlayerDataChanged")
+
+    RoleEvent.OnClientEvent:Connect(function(data)
+        getgenv().RoleCache = data 
+    end)
+end)
+
+-- // 3. BUSCADOR EXACTO (SOLO MURDERER) // --
+local function GetMurderer()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            -- Solo checamos el rol del servidor, nada de buscar el cuchillo visualmente
+            if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
+                -- Checamos que siga vivo
+                local hum = p.Character:FindFirstChild("Humanoid")
+                if hum and hum.Health > 0 then
+                    return p.Character.HumanoidRootPart
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- // 4. WALLCHECK (VISIÓN DE RAYOS X PARA EL MODO AUTO) // --
+local function IsVisible(targetPart)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Head") then return false end
+    
+    local origin = char.Head.Position
+    local direction = (targetPart.Position - origin)
+    
+    local raycastParams = RaycastParams.new()
+    -- Ignoramos nuestro cuerpo y la cámara para que no bloqueen el rayo
+    raycastParams.FilterDescendantsInstances = {char, Workspace.CurrentCamera}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    
+    -- Si no chocó con nada, o chocó con una parte del enemigo, lo estamos viendo
+    if not result or result.Instance:IsDescendantOf(targetPart.Parent) then
+        return true
+    end
+    return false
+end
+
+-- // 5. SISTEMA DE EJECUCIÓN (EQUIPA, DISPARA Y GUARDA) // --
+local isShooting = false
+local function ExecuteKill(target)
+    if isShooting then return end
+    
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer.Backpack
+    if not char or not target then return end
+    
+    local gun = char:FindFirstChild("Gun") or backpack:FindFirstChild("Gun")
+    if gun then
+        isShooting = true
+        
+        -- 1. Equipa
+        if gun.Parent ~= char then 
+            char.Humanoid:EquipTool(gun) 
+            task.wait(0.12) -- Espera para PC/Mobile sync
+        end
+        
+        -- 2. Predicción y Tiro Remoto
+        local ping = tonumber(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString():split(" ")[1]) or 50
+        local Prediction = (ping / 2500) + 0.175
+        local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
+        
+        local shootRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("Shoot")
+        -- Manda el tiro
+        shootRemote:FireServer(CFrame.new(TargetPos + Vector3.new(0, 0.6, 0)), CFrame.new(TargetPos))
+        
+        -- 3. Guarda el arma
+        task.wait(0.05)
+        gun.Parent = backpack
+        
+        -- Cooldown para no saturar
+        task.wait(0.5)
+        isShooting = false
+    end
+end
+
+-- // 6. MODO AUTO: BUCLE ASESINO // --
+task.spawn(function()
+    while true do
+        task.wait(0.1) -- Escanea cada 0.1 segundos
+        if getgenv().AutoShoot_Active then
+            local murd = GetMurderer()
+            -- Si existe y lo podemos ver (Wallcheck aprobado), lo revienta
+            if murd and IsVisible(murd) then
+                ExecuteKill(murd)
+            end
+        end
+    end
+end)
+
+-- // 7. MODO MANUAL: GATILLO DE PANTALLA // --
+local TouchStart = 0
+local StartPos = Vector2.new(0,0)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end 
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then 
+        TouchStart = tick()
+        StartPos = input.Position 
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gp)
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then
+        local Dur = tick() - TouchStart
+        local Dist = (Vector2.new(input.Position.X, input.Position.Y) - Vector2.new(StartPos.X, StartPos.Y)).Magnitude
+        
+        -- Si fue un toque/click rápido
+        if Dur < 0.25 and Dist < 20 then 
+            local murd = GetMurderer()
+            if murd then
+                ExecuteKill(murd) -- Se ejecuta SIN wallcheck (Wallbang directo)
+            end
+        end
+    end
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local cloneref = (cloneref or clonereference or function(instance) return instance end)
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+    
+    if ok then
+        WindUI = result
+    else 
+        if cloneref(game:GetService("RunService")):IsStudio() then
+            WindUI = require(cloneref(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init")))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/32%24"))()
+        end
+    end
+end
+
+-- */  Window  /* --
+local Window = WindUI:CreateWindow({
+    Title = "ZBeta v1.0  |  MM2",
+    Author = "By  •  @znoreste",
+    Folder = "solar:power-bold",
+    Icon = "solar:power-bold",
+    Theme = "Dark",
+    --IconSize = 22*2,
+    NewElements = true,
+    --Size = UDim2.fromOffset(700,700),
+    
+    HideSearchBar = false,
+    
+    OpenButton = {
+        Title = "Z - MM2", -- can be changed
+        CornerRadius = UDim.new(1,0), -- fully rounded
+        StrokeThickness = 3, -- removing outline
+        Enabled = true, -- enable or disable openbutton
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.8,
+        
+        Color = ColorSequence.new( -- gradient
+            Color3.fromHex("#30FF6A"), 
+            Color3.fromHex("#e7ff2f")
+        )
+    },
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Default", -- Default or Mac
+    },
+})
+
+--createPopup()
+
+--Window:SetUIScale(.8)
+
+-- */  Tags  /* --
+do
+    Window:Tag({
+        Title = "v" .. WindUI.Version,
+        Icon = "github",
+        Color = Color3.fromHex("#1c1c1c"),
+        Border = true,
+    })
+end
+
+
+
+
+
+-- */ 1. CATEGORÍAS PRINCIPALES /* --
+
+local SettingsTab = Window:Tab({ 
+    Title = "Settings", 
+    Icon = "solar:settings-bold-duotone" 
+})
+
+Window:Divider()
+
+
+
+
+
+local CombatTab = Window:Tab({ 
+    Title = "Combat", 
+    Icon = "solar:chat-round-unread-outline" 
+})
+
+local HitTab = Window:Tab({ 
+    Title = "Hitboxes", 
+    Icon = "solar:ghost-bold-duotone" 
+})
+
+local RenderTab = Window:Tab({ 
+    Title = "Render", 
+    Icon = "solar:t-shirt-bold-duotone" 
+})
+
+local FarmTab = Window:Tab({ 
+    Title = "Main Farm", 
+    Icon = "solar:box-bold" 
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Botones -- Combat --
+
+
+
+
+CombatTab:Toggle({
+    Title = "Auto Kill Murderer 🎯",
+    Desc = "Dispara solo si lo tienes de frente (Usa Wallcheck).",
+    Callback = function(v) 
+        getgenv().AutoShoot_Active = v 
+        if v then getgenv().ManualShoot_Active = false end -- Apaga el manual si prendes el auto
+    end
+})
+
+CombatTab:Toggle({
+    Title = "Manual Kill (Click/Tap) 👆",
+    Desc = "Da click en la pantalla para dispararle (Wallbang/Atraviesa todo).",
+    Callback = function(v) 
+        getgenv().ManualShoot_Active = v 
+        if v then getgenv().AutoShoot_Active = false end -- Apaga el auto si prendes el manual
+    end
+})
