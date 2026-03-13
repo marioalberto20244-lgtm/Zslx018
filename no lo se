@@ -340,40 +340,45 @@ local FarmTab = Window:Tab({
 
 
 
+-- Variables internas para manejar el menú
+local SelectedShootMode = "Auto"
+local IsShootSystemOn = false
 
-CombatTab:Toggle({
-    Title = "Auto Kill Murderer 🤖",
-    Desc = "Dispara solo si lo tiene de frente (Wallcheck).",
-    Callback = function(v) 
-        getgenv().AutoShoot_Active = v 
-        if v then 
-            getgenv().ManualShoot_Wallbang = false 
-            getgenv().ManualShoot_Legit = false 
+-- Función para actualizar el cerebro según lo que elijas en el menú
+local function UpdateShootSystem()
+    if IsShootSystemOn then
+        if SelectedShootMode == "Auto" then
+            getgenv().AutoShoot_Active = true
+            getgenv().ManualShoot_Active = false
+        elseif SelectedShootMode == "Manual" then
+            getgenv().AutoShoot_Active = false
+            getgenv().ManualShoot_Active = true
         end
+    else
+        -- Si apagas el switch principal, se apaga todo
+        getgenv().AutoShoot_Active = false
+        getgenv().ManualShoot_Active = false
+    end
+end
+
+-- 1. LA LISTA (Dropdown)
+CombatTab:Dropdown({
+    Title = "Shoot Mode",
+    Desc = "Elige cómo quieres reventar al Murderer",
+    Values = {"Auto", "Manual"},
+    Value = "Auto", -- El valor que sale por defecto
+    Callback = function(value)
+        SelectedShootMode = value
+        UpdateShootSystem() -- Actualiza el script por si cambiaste de modo mientras estaba prendido
     end
 })
 
+-- 2. EL INTERRUPTOR GENERAL (Toggle)
 CombatTab:Toggle({
-    Title = "Manual Kill (Wallbang) 🧱",
-    Desc = "Click para disparar: Atraviesa paredes (No Wallcheck).",
+    Title = "Enable Shoot System 🎯",
+    Desc = "Prende o apaga el modo que elegiste arriba",
     Callback = function(v) 
-        getgenv().ManualShoot_Wallbang = v 
-        if v then 
-            getgenv().AutoShoot_Active = false 
-            getgenv().ManualShoot_Legit = false 
-        end
+        IsShootSystemOn = v
+        UpdateShootSystem()
     end
 })
-
-CombatTab:Toggle({
-    Title = "Manual Kill (Legit) 👁️",
-    Desc = "Click para disparar: NO atraviesa paredes (Usa Wallcheck).",
-    Callback = function(v) 
-        getgenv().ManualShoot_Legit = v 
-        if v then 
-            getgenv().AutoShoot_Active = false 
-            getgenv().ManualShoot_Wallbang = false 
-        end
-    end
-})
-
