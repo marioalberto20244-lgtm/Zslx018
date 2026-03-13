@@ -62,7 +62,6 @@ local function GetMurderer()
 end
 
 -- // 4. 🛠️ FIX MAESTRO: REDIRECCIÓN SILENT AIM (HOOK) // --
--- Esto es lo que evita que el tiro se vaya a donde apuntas
 local mt = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -71,18 +70,19 @@ mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
 
-    -- Si el juego intenta disparar y tenemos un modo activo...
+    -- Si el evento se llama "Shoot" y el script está activo...
     if tostring(self) == "Shoot" and method == "FireServer" then
         if getgenv().AutoShoot_Active or getgenv().ManualShoot_Active then
             local murd = GetMurderer()
             if murd then
-                -- Predicción para darle en movimiento
-                local Prediction = 0.175 
+                -- Predicción fina calculando el Ping en tiempo real
+                local ping = tonumber(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString():split(" ")[1]) or 50
+                local Prediction = (ping / 2500) + 0.175 
                 local TargetPos = murd.Position + (murd.AssemblyLinearVelocity * Prediction)
                 
-                -- Obligamos a la bala a ir al Murderer, ignorando a dónde tocaste
-                args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0)) -- Origen (Wallbang)
-                args[2] = CFrame.new(TargetPos) -- Destino (Frente del Murderer)
+                -- Obligamos a la bala a ir al Murderer (Wallbang + Headshot)
+                args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0)) -- Origen mágico
+                args[2] = CFrame.new(TargetPos) -- Destino a la frente
                 
                 return oldNamecall(self, unpack(args))
             end
@@ -112,7 +112,7 @@ local function IsVisible(targetPart)
     return false
 end
 
--- // 6. SISTEMA DE EJECUCIÓN CORTA (EQUIPA, TIRA BASURA Y GUARDA) // --
+-- // 6. SISTEMA DE EJECUCIÓN (EQUIPA, DISPARA Y GUARDA) // --
 local isShooting = false
 local function ExecuteKill()
     if isShooting then return end
@@ -124,17 +124,19 @@ local function ExecuteKill()
     if gun then
         isShooting = true
         
-        -- Equipa
+        -- 1. Equipa si la tiene guardada
         if gun.Parent ~= char then 
             char.Humanoid:EquipTool(gun) 
-            task.wait(0.15) -- Tiempo de sincronización para celular
+            task.wait(0.15) -- Delay clave para que se registre el arma en la mano
         end
         
-        -- Dispara (Mandamos coordenadas falsas, el Hook de arriba las corrige solitas)
-        local shootRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("Shoot")
-        shootRemote:FireServer(char.HumanoidRootPart.CFrame, char.HumanoidRootPart.CFrame)
+        -- 2. Disparo seguro (AQUÍ ESTABA EL ERROR, AHORA LLAMA AL DE LA PISTOLA)
+        local shootRemote = gun:FindFirstChild("Shoot")
+        if shootRemote then
+            shootRemote:FireServer(char.HumanoidRootPart.CFrame, char.HumanoidRootPart.CFrame)
+        end
         
-        -- Guarda el arma
+        -- 3. Guarda de volada
         task.wait(0.05)
         gun.Parent = backpack
         
@@ -149,7 +151,7 @@ task.spawn(function()
         task.wait(0.1)
         if getgenv().AutoShoot_Active and not isShooting then
             local murd = GetMurderer()
-            -- Si existe y ESTÁ VISIBLE (Wallcheck)
+            -- Si existe y lo ve de frente (pasa el Wallcheck)
             if murd and IsVisible(murd) then
                 ExecuteKill()
             end
@@ -157,7 +159,7 @@ task.spawn(function()
     end
 end)
 
--- // 8. MODO MANUAL: GATILLO DE PANTALLA (WALLBANG) // --
+-- // 8. MODO MANUAL: GATILLO DE PANTALLA // --
 local TouchStart = 0
 local StartPos = Vector2.new(0,0)
 
@@ -174,10 +176,9 @@ UserInputService.InputEnded:Connect(function(input, gp)
         local Dur = tick() - TouchStart
         local Dist = (Vector2.new(input.Position.X, input.Position.Y) - Vector2.new(StartPos.X, StartPos.Y)).Magnitude
         
-        -- Si fue un toque rápido y no estamos disparando ya
+        -- Tap rápido = Disparo instantáneo
         if Dur < 0.25 and Dist < 20 and not isShooting then 
             local murd = GetMurderer()
-            -- Si el Murderer existe, disparamos ignorando paredes
             if murd then
                 ExecuteKill() 
             end
