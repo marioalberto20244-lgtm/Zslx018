@@ -21,6 +21,7 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
+
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -46,12 +47,24 @@ task.spawn(function()
     end)
 end)
 
--- // 3. BUSCADOR INTELIGENTE (ACTUALIZA EL TARGET POR FUERA) // --
+-- // 3. BUSCADOR INTELIGENTE (DOBLE CHECK: CACHE + VISUAL) // --
 local function GetMurderer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            -- Solo buscamos por la mente del server (Cero líneas, cero cuchillos visuales)
+            local esAsesino = false
+            
+            -- CHECK 1: La mente del servidor
             if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
+                esAsesino = true
+            end
+            
+            -- CHECK 2: Visual (Por si el servidor se apendeja y no avisa)
+            if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then
+                esAsesino = true
+            end
+
+            -- Si pasó cualquiera de los dos checks, lo marcamos
+            if esAsesino then
                 local hum = p.Character:FindFirstChild("Humanoid")
                 if hum and hum.Health > 0 then
                     return p.Character.HumanoidRootPart
@@ -88,13 +101,13 @@ mt.__namecall = newcclosure(function(self, ...)
             local Prediction = 0.175
             local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
             
-            -- LÓGICA DE LA BALA (NORMAL VS VIP)
+            -- LÓGICA DE LA BALA FIXEADA (Sin crashear el anticheat)
             if getgenv().Shoot_Type == "Normal" then
-                -- La bala sale de tu personaje y viaja hasta el enemigo (No atraviesa paredes mágicamente)
-                args[1] = CFrame.new(myChar.HumanoidRootPart.Position) -- Origen real
+                -- Usamos el CFrame completo (posición + rotación) para que el juego lo acepte
+                args[1] = myChar.HumanoidRootPart.CFrame
             else
-                -- Modo VIP: La bala aparece mágicamente arriba del enemigo y lo mata (Wallbang)
-                args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0)) -- Origen mágico
+                -- Modo VIP: La bala aparece mágicamente arriba del enemigo (Wallbang)
+                args[1] = CFrame.new(TargetPos + Vector3.new(0, 0.6, 0))
             end
             
             args[2] = CFrame.new(TargetPos) -- Destino (Frente del Murderer)
