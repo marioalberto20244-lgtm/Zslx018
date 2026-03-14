@@ -25,10 +25,6 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
-
-
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -193,6 +189,8 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
 end)
+
+
 
 
 
