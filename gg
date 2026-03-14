@@ -33,7 +33,6 @@ getgenv().RoleCache = {}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -93,7 +92,7 @@ local function IsVisible(targetPart)
     return false
 end
 
--- // 5. SISTEMA DE EJECUCIÓN (CON COOLDOWN REALISTA Y FIX MANUAL) // --
+-- // 5. SISTEMA DE EJECUCIÓN // --
 local lastShot = 0
 local shotCooldown = 4 -- ⏱️ 4 SEGUNDOS DE ESPERA PARA RECARGAR
 local isShooting = false
@@ -110,11 +109,11 @@ local function ExecuteKill(isAuto)
     
     local gun = char:FindFirstChild("Gun") or backpack:FindFirstChild("Gun")
     if gun then
-        -- MODO AUTO: Saca el arma automáticamente
+        -- MODO AUTO
         if isAuto and gun.Parent ~= char then
             isShooting = true
             char.Humanoid:EquipTool(gun)
-            task.wait(0.3) -- Espera a que la animación de sacar arma termine
+            task.wait(0.3)
         end
 
         -- MODO MANUAL: Si NO tienes el arma en la mano, no hace nada
@@ -126,11 +125,10 @@ local function ExecuteKill(isAuto)
             local Prediction = 0.175
             local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
             
-            -- Disparo directo y certero
+            -- Disparo directo
             shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
-            lastShot = tick() -- Empiezan a contar los 4 segundos
+            lastShot = tick() 
             
-            -- Solo guarda el arma si está en modo automático
             if isAuto then
                 task.wait(0.1)
                 gun.Parent = backpack
@@ -149,46 +147,36 @@ task.spawn(function()
         if getgenv().AutoShoot_Active then
             local target = getgenv().CurrentTarget
             if target and IsVisible(target) then
-                ExecuteKill(true) -- True significa que es Automático
+                ExecuteKill(true)
             end
         end
     end
 end)
 
--- // 7. MODO MANUAL: INTERCEPTOR DE CLICKS Y PANTALLA // --
-
--- PC: Secuestramos el click del mouse para que la pistola nativa no dispare a lo tonto
+-- // 7. MODO MANUAL: SECUESTRO TOTAL (PC Y MÓVIL UNIDOS) 🔥 // --
 ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
         local char = LocalPlayer.Character
+        
+        -- Verificamos si tienes la pistola en la mano y el Murderer existe
         if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
+            
+            -- 🔥 FILTRO PARA MÓVIL: Si fue toque de pantalla, revisamos DÓNDE tocaste
+            if inputObject.UserInputType == Enum.UserInputType.Touch then
+                local screenSize = Workspace.CurrentCamera.ViewportSize
+                -- Si tocas la mitad IZQUIERDA (Joystick), el script dice "Ah, es pa caminar" y lo deja pasar.
+                if inputObject.Position.X < (screenSize.X / 2) then
+                    return Enum.ContextActionResult.Pass
+                end
+            end
+
+            -- Si tocaste la DERECHA en móvil, o diste CLICK en PC:
             ExecuteKill(false) 
-            return Enum.ContextActionResult.Sink 
+            return Enum.ContextActionResult.Sink -- 🛑 ESTO BLOQUEA LA PISTOLA NATIVA AL 100%
         end
     end
     return Enum.ContextActionResult.Pass
-end, false, Enum.ContextActionPriority.High.Value + 10, Enum.UserInputType.MouseButton1)
-
--- MÓVIL: Disparo inteligente filtrando el Joystick
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end -- Ignora toques en botones de salto o interfaces
-    
-    if input.UserInputType == Enum.UserInputType.Touch and getgenv().ManualShoot_Active then 
-        local screenSize = Workspace.CurrentCamera.ViewportSize
-        
-        -- 🔥 FIX MÓVIL: Cortamos la pantalla a la mitad.
-        -- Si tocas la mitad IZQUIERDA (Joystick), el script dice "Ah, es pa moverse" y lo ignora.
-        if input.Position.X < (screenSize.X / 2) then 
-            return 
-        end
-        
-        -- Si tocas la mitad DERECHA, se activa el Silent Aim.
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
-            ExecuteKill(false)
-        end
-    end
-end)
+end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
 
 
 
