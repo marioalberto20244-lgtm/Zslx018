@@ -28,44 +28,49 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
 getgenv().CurrentTarget = nil 
-getgenv().RoleCache = {}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- // 2. LECTURA DE LA VERDAD ABSOLUTA (ROLE CACHE) // --
-task.spawn(function()
-    local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-    local Gameplay = Remotes:WaitForChild("Gameplay")
-    local RoleEvent = Gameplay:WaitForChild("PlayerDataChanged")
+-- (Se eliminó el Bloque 2 porque ya no nos importan los roles, pura sangre)
 
-    RoleEvent.OnClientEvent:Connect(function(data)
-        getgenv().RoleCache = data 
-    end)
-end)
+-- // 3. BUSCADOR PSICÓPATA (EL MÁS CERCANO) // --
+local function GetClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = math.huge -- Empezamos con una distancia infinita
+    
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = myChar.HumanoidRootPart.Position
 
--- // 3. BUSCADOR INTELIGENTE // --
-local function GetMurderer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
-                local hum = p.Character:FindFirstChild("Humanoid")
-                if hum and hum.Health > 0 then
-                    return p.Character.HumanoidRootPart
+            local hum = p.Character:FindFirstChild("Humanoid")
+            
+            -- Si está vivo, calculamos a cuántos metros está de ti
+            if hum and hum.Health > 0 then
+                local targetPos = p.Character.HumanoidRootPart.Position
+                local distance = (targetPos - myPos).Magnitude
+                
+                -- Si este wey está más cerca que el anterior, lo guardamos como objetivo
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestTarget = p.Character.HumanoidRootPart
                 end
             end
         end
     end
-    return nil
+    
+    return closestTarget
 end
 
+-- Bucle rápido que actualiza al target cada milisegundo
 RunService.RenderStepped:Connect(function()
     if getgenv().AutoShoot_Active or getgenv().ManualShoot_Active then
-        getgenv().CurrentTarget = GetMurderer()
+        getgenv().CurrentTarget = GetClosestTarget()
     else
         getgenv().CurrentTarget = nil
     end
@@ -174,12 +179,12 @@ ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionNa
             ExecuteKill(false) 
             
             -- 🔥 EL FIX DE ORO: Retornamos PASS para que la cámara NUNCA se congele.
-            -- Como nuestro tiro salió en milisegundos, el Murderer muere antes de que el juego reaccione.
             return Enum.ContextActionResult.Pass 
         end
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
+
 
 
 
