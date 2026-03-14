@@ -25,6 +25,10 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
+
+
+
+
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -155,31 +159,42 @@ task.spawn(function()
     end
 end)
 
--- // 7. MODO MANUAL: INTERCEPTOR DE CLICKS (MAGIA PARA PC Y MÓVIL) // --
+-- // 7. MODO MANUAL: INTERCEPTOR DE CLICKS Y PANTALLA // --
 
 -- PC: Secuestramos el click del mouse para que la pistola nativa no dispare a lo tonto
 ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
         local char = LocalPlayer.Character
-        -- Solo secuestramos el click si tienes el arma equipada y el Murderer está vivo
         if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
-            ExecuteKill(false) -- False significa que es Manual
-            return Enum.ContextActionResult.Sink -- 🛑 ESTO BLOQUEA LA PISTOLA NATIVA
+            ExecuteKill(false) 
+            return Enum.ContextActionResult.Sink 
         end
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.UserInputType.MouseButton1)
 
--- MÓVIL: Leemos los toques en pantalla de forma instantánea
+-- MÓVIL: Disparo inteligente filtrando el Joystick
 UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end 
+    if gp then return end -- Ignora toques en botones de salto o interfaces
+    
     if input.UserInputType == Enum.UserInputType.Touch and getgenv().ManualShoot_Active then 
+        local screenSize = Workspace.CurrentCamera.ViewportSize
+        
+        -- 🔥 FIX MÓVIL: Cortamos la pantalla a la mitad.
+        -- Si tocas la mitad IZQUIERDA (Joystick), el script dice "Ah, es pa moverse" y lo ignora.
+        if input.Position.X < (screenSize.X / 2) then 
+            return 
+        end
+        
+        -- Si tocas la mitad DERECHA, se activa el Silent Aim.
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
             ExecuteKill(false)
         end
     end
 end)
+
+
 
 
 
