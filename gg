@@ -24,7 +24,6 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -92,15 +91,12 @@ local function IsVisible(targetPart)
     return false
 end
 
--- // 5. SISTEMA DE EJECUCIÓN // --
+-- // 5. SISTEMA DE EJECUCIÓN (FIX SUPREMO) // --
 local lastShot = 0
-local shotCooldown = 4 -- ⏱️ 4 SEGUNDOS DE ESPERA PARA RECARGAR
+local shotCooldown = 4 -- Solo aplica para el Auto Shoot
 local isShooting = false
 
 local function ExecuteKill(isAuto)
-    local now = tick()
-    if isShooting or (now - lastShot < shotCooldown) then return end
-    
     local char = LocalPlayer.Character
     local backpack = LocalPlayer.Backpack
     local target = getgenv().CurrentTarget
@@ -108,35 +104,41 @@ local function ExecuteKill(isAuto)
     if not char or not target then return end
     
     local gun = char:FindFirstChild("Gun") or backpack:FindFirstChild("Gun")
-    if gun then
-        -- MODO AUTO
-        if isAuto and gun.Parent ~= char then
+    if not gun then return end
+    
+    local shoot = gun:FindFirstChild("Shoot")
+    if not shoot then return end
+
+    if isAuto then
+        -- MODO AUTO: Con animaciones y tiempos de espera para que se vea real
+        local now = tick()
+        if isShooting or (now - lastShot < shotCooldown) then return end
+        
+        if gun.Parent ~= char then
             isShooting = true
             char.Humanoid:EquipTool(gun)
             task.wait(0.3)
         end
 
-        -- MODO MANUAL: Si NO tienes el arma en la mano, no hace nada
-        if not isAuto and gun.Parent ~= char then return end
-
-        local shoot = gun:FindFirstChild("Shoot")
-        if shoot then
-            isShooting = true
-            local Prediction = 0.175
-            local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
-            
-            -- Disparo directo
-            shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
-            lastShot = tick() 
-            
-            if isAuto then
-                task.wait(0.1)
-                gun.Parent = backpack
-            end
-        end
+        isShooting = true
+        local Prediction = 0.175
+        local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
+        shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
+        lastShot = tick() 
+        
+        task.wait(0.1)
+        gun.Parent = backpack
         
         task.wait(0.5)
         isShooting = false
+    else
+        -- MODO MANUAL: ¡Disparo instantáneo sin reglas para ganarle al juego!
+        if gun.Parent == char then
+            local Prediction = 0.175
+            local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
+            shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
+            lastShot = tick() -- Actualizamos para que el Auto no interfiera
+        end
     end
 end
 
@@ -153,30 +155,32 @@ task.spawn(function()
     end
 end)
 
--- // 7. MODO MANUAL: SECUESTRO TOTAL (PC Y MÓVIL UNIDOS) 🔥 // --
+-- // 7. MODO MANUAL: INTERCEPTOR VELOCIDAD DE LA LUZ 🔥 // --
 ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
         local char = LocalPlayer.Character
         
-        -- Verificamos si tienes la pistola en la mano y el Murderer existe
         if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
             
-            -- 🔥 FILTRO PARA MÓVIL: Si fue toque de pantalla, revisamos DÓNDE tocaste
+            -- Filtro para Móvil: Si tocas el Joystick (Izquierda), no hace nada.
             if inputObject.UserInputType == Enum.UserInputType.Touch then
                 local screenSize = Workspace.CurrentCamera.ViewportSize
-                -- Si tocas la mitad IZQUIERDA (Joystick), el script dice "Ah, es pa caminar" y lo deja pasar.
                 if inputObject.Position.X < (screenSize.X / 2) then
                     return Enum.ContextActionResult.Pass
                 end
             end
 
-            -- Si tocaste la DERECHA en móvil, o diste CLICK en PC:
+            -- Si tocaste la Derecha o diste click en PC, tira el balazo INMEDIATAMENTE
             ExecuteKill(false) 
-            return Enum.ContextActionResult.Sink -- 🛑 ESTO BLOQUEA LA PISTOLA NATIVA AL 100%
+            
+            -- 🔥 EL FIX DE ORO: Retornamos PASS para que la cámara NUNCA se congele.
+            -- Como nuestro tiro salió en milisegundos, el Murderer muere antes de que el juego reaccione.
+            return Enum.ContextActionResult.Pass 
         end
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
+
 
 
 
