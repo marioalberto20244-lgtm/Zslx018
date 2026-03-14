@@ -18,7 +18,6 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -40,7 +39,7 @@ local function GetClosestPlayer()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local hum = p.Character:FindFirstChild("Humanoid")
-            if hum and hum.Health > 0 then
+            if hum and hum.Health > 0 and not p.Character:FindFirstChildOfClass("ForceField") then
                 local d = (p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
                 if d < dist then
                     dist = d
@@ -80,7 +79,7 @@ local function GetWeapon()
     return nil, nil
 end
 
--- // 4. SISTEMA DE EJECUCIÓN (FIX MIRADA + DAÑO REAL) // --
+-- // 4. SISTEMA DE EJECUCIÓN (FIX DE BALA INVISIBLE Y DAÑO) // --
 local lastShot = 0
 local cooldown = 1.5 
 local isShooting = false
@@ -96,27 +95,33 @@ local function ExecuteKill(isAuto)
     local now = tick()
     if isShooting or (now - lastShot < cooldown) then return end
 
-    -- MODO AUTO: Equipa
     if isAuto and gun.Parent ~= char then
         isShooting = true
         char.Humanoid:EquipTool(gun)
         task.wait(0.2)
     end
 
-    -- MANUAL: Solo dispara si la tienes en mano
     if not isAuto and gun.Parent ~= char then return end
 
     isShooting = true
     
-    -- 🔥 LA MAGIA: Forzamos al personaje a mirar al objetivo para que el servidor valide el daño
     local Prediction = 0.18
     local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
     
-    -- Giramos el pecho hacia el enemigo instantáneamente
+    -- Giramos el pecho hacia el enemigo para el servidor
     char.HumanoidRootPart.CFrame = CFrame.lookAt(char.HumanoidRootPart.Position, Vector3.new(TargetPos.X, char.HumanoidRootPart.Position.Y, TargetPos.Z))
 
-    -- Disparamos (Mandamos el CFrame de nuestra posición actual ya girada)
-    shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
+    -- 🔥 LA MAGIA CONTRA LA BALA INVISIBLE:
+    -- Buscamos el cañón de la pistola. Si no, aventamos el tiro 2 metros al frente.
+    local originCFrame
+    if gun:FindFirstChild("Handle") then
+        originCFrame = gun.Handle.CFrame
+    else
+        originCFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+    end
+
+    -- Disparamos desde el cañón hacia el enemigo
+    shoot:FireServer(originCFrame, CFrame.new(TargetPos))
     
     lastShot = tick()
     
@@ -139,7 +144,7 @@ task.spawn(function()
     end
 end)
 
--- // 6. GATILLO MANUAL (CON FIX DE MIRADA) // --
+-- // 6. GATILLO MANUAL // --
 ContextActionService:BindActionAtPriority("ZBeta_DuelShoot", function(name, state, input)
     if state == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
         local char = LocalPlayer.Character
@@ -154,8 +159,6 @@ ContextActionService:BindActionAtPriority("ZBeta_DuelShoot", function(name, stat
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
-
-
 
 
 
