@@ -31,7 +31,7 @@ getgenv().CurrentTarget = nil
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
@@ -49,7 +49,6 @@ local function GetClosestPlayer()
                 local d = (p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
                 if d < dist then
                     dist = d
-                    -- Apuntamos a la CABEZA para evitar que la bala choque con los brazos
                     target = p.Character:FindFirstChild("Head") or p.Character.HumanoidRootPart
                 end
             end
@@ -66,41 +65,46 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- // 3. BUSCADOR AGRESIVO DE DEFAULTGUN // --
-local function GetWeapon()
-    local char = LocalPlayer.Character
-    local backpack = LocalPlayer.Backpack
-    local gun = (char and char:FindFirstChild("DefaultGun")) or backpack:FindFirstChild("DefaultGun")
-    
-    if not gun then
-        for _, item in pairs(char:GetChildren()) do if item:IsA("Tool") and item.Name:match("Gun") then gun = item break end end
-    end
-    if not gun then
-        for _, item in pairs(backpack:GetChildren()) do if item:IsA("Tool") and item.Name:match("Gun") then gun = item break end end
-    end
+-- // 3. EL HOOK SEGURO (MÉTODO PARA ENGAÑAR A LA BALA ORIGINAL SIN CRASHEAR XENO) // --
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
 
-    if gun then
-        local remote = gun:FindFirstChild("Shoot") or gun:FindFirstChildOfClass("RemoteEvent")
-        return gun, remote
+    -- Si el juego intenta mandar la bala original al servidor...
+    if method == "FireServer" and tostring(self) == "Shoot" and (getgenv().AutoShoot_Active or getgenv().ManualShoot_Active) then
+        local target = getgenv().CurrentTarget
+        local char = LocalPlayer.Character
+        
+        -- Si tenemos un objetivo y tenemos la pistola en la mano...
+        if target and char and char:FindFirstChild("DefaultGun") then
+            local Prediction = 0.18
+            local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
+            
+            -- Redirigimos la BALA ORIGINAL hacia la cabeza. 
+            -- No creamos una bala falsa, modificamos la que el juego ya creó.
+            if type(args[1]) == "CFrame" and type(args[2]) == "CFrame" then
+                args[2] = CFrame.new(TargetPos) -- Cambiamos el destino al objetivo
+                return oldNamecall(self, unpack(args))
+            elseif type(args[1]) == "Vector3" then
+                args[1] = TargetPos -- Por si acaso pide solo la posición
+                return oldNamecall(self, unpack(args))
+            end
+        end
     end
-    return nil, nil
-end
+    return oldNamecall(self, ...)
+end)
 
--- // 4. SISTEMA DE EJECUCIÓN (FIX DE DAÑO REAL Y ROTACIÓN) // --
-local lastShot = 0
-local cooldown = 1.5 
+-- // 4. SISTEMA DE EJECUCIÓN // --
+-- Como usamos Hook, nosotros no disparamos, solo forzamos el click (simulación real)
 local isShooting = false
-
 local function ExecuteKill(isAuto)
     local target = getgenv().CurrentTarget
     local char = LocalPlayer.Character
-    if not target or not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if not target or not char then return end
 
-    local gun, shoot = GetWeapon()
-    if not gun or not shoot then return end
-
-    local now = tick()
-    if isShooting or (now - lastShot < cooldown) then return end
+    local gun = char:FindFirstChild("DefaultGun") or LocalPlayer.Backpack:FindFirstChild("DefaultGun")
+    if not gun then return end
 
     if isAuto and gun.Parent ~= char then
         isShooting = true
@@ -112,29 +116,13 @@ local function ExecuteKill(isAuto)
 
     isShooting = true
     
-    local Prediction = 0.18
-    local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
-    
-    -- Giramos tu cuerpo visualmente hacia el enemigo (sin inclinarte)
-    local myPos = char.HumanoidRootPart.Position
-    char.HumanoidRootPart.CFrame = CFrame.lookAt(myPos, Vector3.new(TargetPos.X, myPos.Y, TargetPos.Z))
-
-    -- 🔥 FIX SUPREMO DE BALA "FALSA":
-    -- Buscamos el cañón y creamos un CFrame que esté en la pistola PERO que MIRE EXACTAMENTE al objetivo.
-    local originPos = char.HumanoidRootPart.Position
-    if gun:FindFirstChild("Handle") then
-        originPos = gun.Handle.Position
-    end
-    
-    -- Esta línea evita que la bala se vaya al piso. La obliga a salir directo a la cabeza.
-    local OriginCFrame = CFrame.lookAt(originPos, TargetPos)
-
-    -- ¡Fuego!
-    shoot:FireServer(OriginCFrame, CFrame.new(TargetPos))
-    
-    lastShot = tick()
+    -- Simulamos un click izquierdo "Virtual" usando las funciones de la pistola misma.
+    -- Esto hará que el juego genere su bala visual real, y nuestro Hook (Bloque 3) la redirigirá.
+    gun:Activate()
     
     if isAuto then
+        task.wait(0.1)
+        gun:Deactivate()
         task.wait(0.1)
         gun.Parent = LocalPlayer.Backpack
     end
@@ -146,28 +134,47 @@ end
 -- // 5. BUCLE AUTO // --
 task.spawn(function()
     while true do
-        task.wait(0.05)
+        task.wait(0.1)
         if getgenv().AutoShoot_Active then
             ExecuteKill(true)
         end
     end
 end)
 
--- // 6. GATILLO MANUAL // --
-ContextActionService:BindActionAtPriority("ZBeta_DuelShoot", function(name, state, input)
-    if state == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("DefaultGun") and getgenv().CurrentTarget then
-            if input.UserInputType == Enum.UserInputType.Touch then
-                if input.Position.X < (Workspace.CurrentCamera.ViewportSize.X / 2) then
-                    return Enum.ContextActionResult.Pass
-                end
+-- // 6. GATILLO MANUAL (RESTAURADO A USERINPUTSERVICE PARA NO BLOQUEAR LA BALA REAL) // --
+local TouchStart = 0
+local StartPos = Vector2.new(0,0)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end 
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then 
+        local screenSize = Workspace.CurrentCamera.ViewportSize
+        -- Filtro Joystick para móvil
+        if input.UserInputType == Enum.UserInputType.Touch and input.Position.X < (screenSize.X / 2) then return end
+        
+        TouchStart = tick()
+        StartPos = input.Position 
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gp)
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and getgenv().ManualShoot_Active then
+        local Dur = tick() - TouchStart
+        local Dist = (Vector2.new(input.Position.X, input.Position.Y) - Vector2.new(StartPos.X, StartPos.Y)).Magnitude
+        
+        -- Si fue un click rápido (no arrastrar) y estamos en modo manual
+        if Dur < 0.25 and Dist < 20 and not isShooting then 
+            local screenSize = Workspace.CurrentCamera.ViewportSize
+            if input.UserInputType == Enum.UserInputType.Touch and input.Position.X < (screenSize.X / 2) then return end
+            
+            if getgenv().CurrentTarget then
+                -- No hacemos ExecuteKill aquí porque tú ya diste el click real, 
+                -- el Hook arriba se encargará de atrapar tu bala.
             end
-            ExecuteKill(false)
         end
     end
-    return Enum.ContextActionResult.Pass
-end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
+end)
+
 
 
 
