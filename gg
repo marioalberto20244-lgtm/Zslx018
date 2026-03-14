@@ -1,0 +1,379 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris") 
+local Stats = game:GetService("Stats")
+local Workspace = game:GetService("Workspace")
+
+--// 2. VARIABLES DE ENTORNO //--
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // 1. CONTROLADORES // --
+getgenv().AutoShoot_Active = false
+getgenv().ManualShoot_Active = false
+getgenv().CurrentTarget = nil 
+getgenv().RoleCache = {}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- // 2. LECTURA DE LA VERDAD ABSOLUTA (ROLE CACHE) // --
+task.spawn(function()
+    local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+    local Gameplay = Remotes:WaitForChild("Gameplay")
+    local RoleEvent = Gameplay:WaitForChild("PlayerDataChanged")
+
+    RoleEvent.OnClientEvent:Connect(function(data)
+        getgenv().RoleCache = data 
+    end)
+end)
+
+-- // 3. BUSCADOR INTELIGENTE // --
+local function GetMurderer()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            if getgenv().RoleCache[p.Name] and getgenv().RoleCache[p.Name].Role == "Murderer" then
+                local hum = p.Character:FindFirstChild("Humanoid")
+                if hum and hum.Health > 0 then
+                    return p.Character.HumanoidRootPart
+                end
+            end
+        end
+    end
+    return nil
+end
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().AutoShoot_Active or getgenv().ManualShoot_Active then
+        getgenv().CurrentTarget = GetMurderer()
+    else
+        getgenv().CurrentTarget = nil
+    end
+end)
+
+-- // 4. WALLCHECK // --
+local function IsVisible(targetPart)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Head") then return false end
+    
+    local origin = char.Head.Position
+    local direction = (targetPart.Position - origin)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {char, Workspace.CurrentCamera}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    
+    if not result or result.Instance:IsDescendantOf(targetPart.Parent) then
+        return true
+    end
+    return false
+end
+
+-- // 5. SISTEMA DE EJECUCIÓN (CON COOLDOWN REALISTA Y FIX MANUAL) // --
+local lastShot = 0
+local shotCooldown = 4 -- ⏱️ 4 SEGUNDOS DE ESPERA PARA RECARGAR
+local isShooting = false
+
+local function ExecuteKill(isAuto)
+    local now = tick()
+    if isShooting or (now - lastShot < shotCooldown) then return end
+    
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer.Backpack
+    local target = getgenv().CurrentTarget
+    
+    if not char or not target then return end
+    
+    local gun = char:FindFirstChild("Gun") or backpack:FindFirstChild("Gun")
+    if gun then
+        -- MODO AUTO: Saca el arma automáticamente
+        if isAuto and gun.Parent ~= char then
+            isShooting = true
+            char.Humanoid:EquipTool(gun)
+            task.wait(0.3) -- Espera a que la animación de sacar arma termine
+        end
+
+        -- MODO MANUAL: Si NO tienes el arma en la mano, no hace nada
+        if not isAuto and gun.Parent ~= char then return end
+
+        local shoot = gun:FindFirstChild("Shoot")
+        if shoot then
+            isShooting = true
+            local Prediction = 0.175
+            local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
+            
+            -- Disparo directo y certero
+            shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
+            lastShot = tick() -- Empiezan a contar los 4 segundos
+            
+            -- Solo guarda el arma si está en modo automático
+            if isAuto then
+                task.wait(0.1)
+                gun.Parent = backpack
+            end
+        end
+        
+        task.wait(0.5)
+        isShooting = false
+    end
+end
+
+-- // 6. MODO AUTO: BUCLE ASESINO // --
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if getgenv().AutoShoot_Active then
+            local target = getgenv().CurrentTarget
+            if target and IsVisible(target) then
+                ExecuteKill(true) -- True significa que es Automático
+            end
+        end
+    end
+end)
+
+-- // 7. MODO MANUAL: INTERCEPTOR DE CLICKS (MAGIA PARA PC Y MÓVIL) // --
+
+-- PC: Secuestramos el click del mouse para que la pistola nativa no dispare a lo tonto
+ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
+        local char = LocalPlayer.Character
+        -- Solo secuestramos el click si tienes el arma equipada y el Murderer está vivo
+        if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
+            ExecuteKill(false) -- False significa que es Manual
+            return Enum.ContextActionResult.Sink -- 🛑 ESTO BLOQUEA LA PISTOLA NATIVA
+        end
+    end
+    return Enum.ContextActionResult.Pass
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.UserInputType.MouseButton1)
+
+-- MÓVIL: Leemos los toques en pantalla de forma instantánea
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end 
+    if input.UserInputType == Enum.UserInputType.Touch and getgenv().ManualShoot_Active then 
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
+            ExecuteKill(false)
+        end
+    end
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local cloneref = (cloneref or clonereference or function(instance) return instance end)
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+    
+    if ok then
+        WindUI = result
+    else 
+        if cloneref(game:GetService("RunService")):IsStudio() then
+            WindUI = require(cloneref(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init")))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/32%24"))()
+        end
+    end
+end
+
+-- */  Window  /* --
+local Window = WindUI:CreateWindow({
+    Title = "ZBeta v1.0  |  MM2",
+    Author = "By  •  @znoreste",
+    Folder = "solar:power-bold",
+    Icon = "solar:power-bold",
+    Theme = "Dark",
+    --IconSize = 22*2,
+    NewElements = true,
+    --Size = UDim2.fromOffset(700,700),
+    
+    HideSearchBar = false,
+    
+    OpenButton = {
+        Title = "Z - MM2", -- can be changed
+        CornerRadius = UDim.new(1,0), -- fully rounded
+        StrokeThickness = 3, -- removing outline
+        Enabled = true, -- enable or disable openbutton
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.8,
+        
+        Color = ColorSequence.new( -- gradient
+            Color3.fromHex("#30FF6A"), 
+            Color3.fromHex("#e7ff2f")
+        )
+    },
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Default", -- Default or Mac
+    },
+})
+
+--createPopup()
+
+--Window:SetUIScale(.8)
+
+-- */  Tags  /* --
+do
+    Window:Tag({
+        Title = "v" .. WindUI.Version,
+        Icon = "github",
+        Color = Color3.fromHex("#1c1c1c"),
+        Border = true,
+    })
+end
+
+
+
+
+
+-- */ 1. CATEGORÍAS PRINCIPALES /* --
+
+local SettingsTab = Window:Tab({ 
+    Title = "Settings", 
+    Icon = "solar:settings-bold-duotone" 
+})
+
+Window:Divider()
+
+
+
+
+
+local CombatTab = Window:Tab({ 
+    Title = "Combat", 
+    Icon = "solar:chat-round-unread-outline" 
+})
+
+local HitTab = Window:Tab({ 
+    Title = "Hitboxes", 
+    Icon = "solar:ghost-bold-duotone" 
+})
+
+local RenderTab = Window:Tab({ 
+    Title = "Render", 
+    Icon = "solar:t-shirt-bold-duotone" 
+})
+
+local FarmTab = Window:Tab({ 
+    Title = "Main Farm", 
+    Icon = "solar:box-bold" 
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Botones -- Combat --
+
+
+
+
+
+
+
+
+-- Variable para guardar lo que eliges en la lista y si el botón está prendido
+local ModoElegido = "Auto"
+local SwitchPrendido = false
+
+-- Esta función hace que todo se actualice EN CORTO
+local function ActualizarEnCorto()
+    if SwitchPrendido then
+        -- Actualiza el modo (Auto o Manual)
+        if ModoElegido == "Auto" then
+            getgenv().AutoShoot_Active = true
+            getgenv().ManualShoot_Active = false
+        elseif ModoElegido == "Manual" then
+            getgenv().AutoShoot_Active = false
+            getgenv().ManualShoot_Active = true
+        end
+    else
+        -- Si apagas el botón, se apagan los dos de golpe
+        getgenv().AutoShoot_Active = false
+        getgenv().ManualShoot_Active = false
+    end
+end
+
+-- 1. EL BOTÓN MAESTRO (Toggle) <-- ¡AHORA ESTÁ ARRIBA!
+CombatTab:Toggle({
+    Title = "Activar Disparo Asesino 🎯",
+    Desc = "Prende o apaga el sistema de disparo.",
+    Callback = function(estado) 
+        SwitchPrendido = estado
+        ActualizarEnCorto() -- Prende o apaga la maquinaria al instante
+    end
+})
+
+-- 2. LA LISTA (Dropdown) <-- ¡AHORA ESTÁ ABAJO!
+CombatTab:Dropdown({
+    Title = "Modo de Disparo ⚙️",
+    Desc = "Auto (Solo de frente) | Manual (Click/Tap)",
+    Values = {"Auto", "Manual"},
+    Value = "Auto", -- Valor por defecto
+    Callback = function(valor)
+        ModoElegido = valor
+        ActualizarEnCorto() -- Actualiza el modo en chinga si está prendido
+    end
+})
