@@ -23,7 +23,6 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
-
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -35,12 +34,10 @@ local ContextActionService = game:GetService("ContextActionService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- (Se eliminó el Bloque 2 porque ya no nos importan los roles, pura sangre)
-
--- // 3. BUSCADOR PSICÓPATA (EL MÁS CERCANO) // --
+-- // 2. BUSCADOR PSICÓPATA (EL MÁS CERCANO) // --
 local function GetClosestTarget()
     local closestTarget = nil
-    local shortestDistance = math.huge -- Empezamos con una distancia infinita
+    local shortestDistance = math.huge 
     
     local myChar = LocalPlayer.Character
     if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -50,12 +47,11 @@ local function GetClosestTarget()
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local hum = p.Character:FindFirstChild("Humanoid")
             
-            -- Si está vivo, calculamos a cuántos metros está de ti
-            if hum and hum.Health > 0 then
+            -- Si está vivo y no tiene campo de fuerza que lo haga invencible
+            if hum and hum.Health > 0 and not p.Character:FindFirstChildOfClass("ForceField") then
                 local targetPos = p.Character.HumanoidRootPart.Position
                 local distance = (targetPos - myPos).Magnitude
                 
-                -- Si este wey está más cerca que el anterior, lo guardamos como objetivo
                 if distance < shortestDistance then
                     shortestDistance = distance
                     closestTarget = p.Character.HumanoidRootPart
@@ -76,7 +72,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- // 4. WALLCHECK // --
+-- // 3. WALLCHECK // --
 local function IsVisible(targetPart)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("Head") then return false end
@@ -96,9 +92,30 @@ local function IsVisible(targetPart)
     return false
 end
 
+-- // 4. BUSCADOR AGRESIVO DE ARMAS (NUEVO FIX) // --
+local function FindWeaponAndRemote(folder)
+    for _, item in pairs(folder:GetChildren()) do
+        -- Busca cualquier herramienta que se llame Gun o contenga "Shoot"
+        if item:IsA("Tool") and (item.Name:match("Gun") or item:FindFirstChild("Shoot")) then
+            local remote = item:FindFirstChild("Shoot")
+            -- Si el Shoot está escondido adentro de una carpeta, lo encuentra
+            if not remote then
+                for _, desc in pairs(item:GetDescendants()) do
+                    if desc:IsA("RemoteEvent") and (desc.Name == "Shoot" or desc.Name == "FireServer") then
+                        remote = desc
+                        break
+                    end
+                end
+            end
+            if remote then return item, remote end
+        end
+    end
+    return nil, nil
+end
+
 -- // 5. SISTEMA DE EJECUCIÓN (FIX SUPREMO) // --
 local lastShot = 0
-local shotCooldown = 4 -- Solo aplica para el Auto Shoot
+local shotCooldown = 2 -- ⏱️ Bajado a 2 segundos para duelos rápidos
 local isShooting = false
 
 local function ExecuteKill(isAuto)
@@ -108,14 +125,16 @@ local function ExecuteKill(isAuto)
     
     if not char or not target then return end
     
-    local gun = char:FindFirstChild("Gun") or backpack:FindFirstChild("Gun")
-    if not gun then return end
+    -- Usamos el buscador agresivo que no falla
+    local gun, shoot = FindWeaponAndRemote(char)
+    if not gun then
+        gun, shoot = FindWeaponAndRemote(backpack)
+    end
     
-    local shoot = gun:FindFirstChild("Shoot")
-    if not shoot then return end
+    if not gun or not shoot then return end
 
     if isAuto then
-        -- MODO AUTO: Con animaciones y tiempos de espera para que se vea real
+        -- MODO AUTO
         local now = tick()
         if isShooting or (now - lastShot < shotCooldown) then return end
         
@@ -137,12 +156,12 @@ local function ExecuteKill(isAuto)
         task.wait(0.5)
         isShooting = false
     else
-        -- MODO MANUAL: ¡Disparo instantáneo sin reglas para ganarle al juego!
+        -- MODO MANUAL: ¡Disparo instantáneo a la velocidad de la luz!
         if gun.Parent == char then
             local Prediction = 0.175
             local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
             shoot:FireServer(char.HumanoidRootPart.CFrame, CFrame.new(TargetPos))
-            lastShot = tick() -- Actualizamos para que el Auto no interfiera
+            lastShot = tick()
         end
     end
 end
@@ -164,27 +183,27 @@ end)
 ContextActionService:BindActionAtPriority("ZBeta_ManualShoot", function(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin and getgenv().ManualShoot_Active then
         local char = LocalPlayer.Character
+        local target = getgenv().CurrentTarget
         
-        if char and char:FindFirstChild("Gun") and getgenv().CurrentTarget then
-            
-            -- Filtro para Móvil: Si tocas el Joystick (Izquierda), no hace nada.
-            if inputObject.UserInputType == Enum.UserInputType.Touch then
-                local screenSize = Workspace.CurrentCamera.ViewportSize
-                if inputObject.Position.X < (screenSize.X / 2) then
-                    return Enum.ContextActionResult.Pass
+        if char and target then
+            -- Verificamos si tienes la pistola en la mano con el buscador agresivo
+            local gunInHand, _ = FindWeaponAndRemote(char)
+            if gunInHand then
+                -- Filtro para Móvil: Ignorar joystick (Mitad izquierda)
+                if inputObject.UserInputType == Enum.UserInputType.Touch then
+                    local screenSize = Workspace.CurrentCamera.ViewportSize
+                    if inputObject.Position.X < (screenSize.X / 2) then
+                        return Enum.ContextActionResult.Pass
+                    end
                 end
-            end
 
-            -- Si tocaste la Derecha o diste click en PC, tira el balazo INMEDIATAMENTE
-            ExecuteKill(false) 
-            
-            -- 🔥 EL FIX DE ORO: Retornamos PASS para que la cámara NUNCA se congele.
-            return Enum.ContextActionResult.Pass 
+                ExecuteKill(false) 
+                return Enum.ContextActionResult.Pass 
+            end
         end
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
-
 
 
 
