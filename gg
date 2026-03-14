@@ -18,6 +18,12 @@ local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
 
 
 
+
+
+
+
+
+
 -- // 1. CONTROLADORES // --
 getgenv().AutoShoot_Active = false
 getgenv().ManualShoot_Active = false
@@ -43,7 +49,8 @@ local function GetClosestPlayer()
                 local d = (p.Character.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
                 if d < dist then
                     dist = d
-                    target = p.Character.HumanoidRootPart
+                    -- Apuntamos a la CABEZA para evitar que la bala choque con los brazos
+                    target = p.Character:FindFirstChild("Head") or p.Character.HumanoidRootPart
                 end
             end
         end
@@ -79,7 +86,7 @@ local function GetWeapon()
     return nil, nil
 end
 
--- // 4. SISTEMA DE EJECUCIÓN (FIX DE BALA INVISIBLE Y DAÑO) // --
+-- // 4. SISTEMA DE EJECUCIÓN (FIX DE DAÑO REAL Y ROTACIÓN) // --
 local lastShot = 0
 local cooldown = 1.5 
 local isShooting = false
@@ -108,20 +115,22 @@ local function ExecuteKill(isAuto)
     local Prediction = 0.18
     local TargetPos = target.Position + (target.AssemblyLinearVelocity * Prediction)
     
-    -- Giramos el pecho hacia el enemigo para el servidor
-    char.HumanoidRootPart.CFrame = CFrame.lookAt(char.HumanoidRootPart.Position, Vector3.new(TargetPos.X, char.HumanoidRootPart.Position.Y, TargetPos.Z))
+    -- Giramos tu cuerpo visualmente hacia el enemigo (sin inclinarte)
+    local myPos = char.HumanoidRootPart.Position
+    char.HumanoidRootPart.CFrame = CFrame.lookAt(myPos, Vector3.new(TargetPos.X, myPos.Y, TargetPos.Z))
 
-    -- 🔥 LA MAGIA CONTRA LA BALA INVISIBLE:
-    -- Buscamos el cañón de la pistola. Si no, aventamos el tiro 2 metros al frente.
-    local originCFrame
+    -- 🔥 FIX SUPREMO DE BALA "FALSA":
+    -- Buscamos el cañón y creamos un CFrame que esté en la pistola PERO que MIRE EXACTAMENTE al objetivo.
+    local originPos = char.HumanoidRootPart.Position
     if gun:FindFirstChild("Handle") then
-        originCFrame = gun.Handle.CFrame
-    else
-        originCFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+        originPos = gun.Handle.Position
     end
+    
+    -- Esta línea evita que la bala se vaya al piso. La obliga a salir directo a la cabeza.
+    local OriginCFrame = CFrame.lookAt(originPos, TargetPos)
 
-    -- Disparamos desde el cañón hacia el enemigo
-    shoot:FireServer(originCFrame, CFrame.new(TargetPos))
+    -- ¡Fuego!
+    shoot:FireServer(OriginCFrame, CFrame.new(TargetPos))
     
     lastShot = tick()
     
@@ -159,6 +168,12 @@ ContextActionService:BindActionAtPriority("ZBeta_DuelShoot", function(name, stat
     end
     return Enum.ContextActionResult.Pass
 end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch)
+
+
+
+
+
+
 
 
 
