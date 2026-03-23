@@ -1774,7 +1774,6 @@ HUDTab:Button({
 
 
 
-
 -- // SECCIÓN COMBATE (AIMBOT) // --
 CombatTab:Section({ Title = "Configuración de Aimbot" })
 
@@ -1785,21 +1784,33 @@ CombatTab:Toggle({
     Callback = function(state) _G.Z_Aimbot_Active = state end
 })
 
-CombatTab:Input({
-    Title = "Fuerza de Anclaje (1-25)",
-    Value = tostring(_G.Z_Aimbot_Smoothing),
+-- 1. Slider de Fuerza (Smoothing)
+CombatTab:Slider({
+    Title = "Fuerza de Anclaje (Smoothing)",
+    Desc = "ejemp.",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 25,
+        Default = _G.Z_Aimbot_Smoothing or 5,
+    },
     Callback = function(val)
-        local num = tonumber(val)
-        if num then _G.Z_Aimbot_Smoothing = math.clamp(num, 1, 25) end
+        _G.Z_Aimbot_Smoothing = val
     end
 })
 
-CombatTab:Input({
+-- 2. Slider de Rango de FOV
+CombatTab:Slider({
     Title = "Rango de FOV",
-    Value = tostring(_G.Z_Aimbot_FOV),
+    Desc = "Ejemp.",
+    Step = 1,
+    Value = {
+        Min = 10,
+        Max = 800,
+        Default = _G.Z_Aimbot_FOV or 150,
+    },
     Callback = function(val)
-        local num = tonumber(val)
-        if num then _G.Z_Aimbot_FOV = num end
+        _G.Z_Aimbot_FOV = val
     end
 })
 
@@ -1815,7 +1826,6 @@ CombatTab:Section({ Title = "Filtros" })
 CombatTab:Toggle({ Title = "Team Check", Value = _G.Z_Aimbot_TeamCheck, Callback = function(s) _G.Z_Aimbot_TeamCheck = s end })
 CombatTab:Toggle({ Title = "Wall Check", Value = _G.Z_Aimbot_WallCheck, Callback = function(s) _G.Z_Aimbot_WallCheck = s end })
 CombatTab:Toggle({ Title = "Mostrar FOV", Value = _G.Z_Aimbot_ShowFOV, Callback = function(s) _G.Z_Aimbot_ShowFOV = s end })
-
 
 
 
