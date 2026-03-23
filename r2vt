@@ -2476,7 +2476,6 @@ RenderTab:Input({
 
 
 
-
 -- // 🛠️ SERVICIOS Y SETUP DE LÍNEAS // --
 local GuiService = game:GetService("GuiService")
 local lastSearch = 0
