@@ -2462,13 +2462,13 @@ RenderTab:Input({
 
 
 
--- // 🛠️ CONFIGURACIÓN DE LÍNEAS UNIVERSALES (FPS LITE) // --
+-- // 🛠️ SERVICIOS Y SETUP DE LÍNEAS // --
 local GuiService = game:GetService("GuiService")
 local lastSearch = 0
 local targetPlayer = nil
 local targetPart = nil
 
--- Creamos un grupo de 16 líneas (Alcanza para Círculo, Cuadrado y Estrella)
+-- Creamos 16 líneas (El iPhone sí las lee bien)
 local FOVLines = {}
 for i = 1, 16 do
     local l = Drawing.new("Line")
@@ -2481,7 +2481,7 @@ end
 
 local BodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
 
--- // 1. CENTRO REAL (FIX IPHONE/PC) // --
+-- // 1. CENTRO EXACTO (FIX IPHONE) // --
 local function GetCenter()
     local vps = Camera.ViewportSize
     local inset = GuiService:GetGuiInset()
@@ -2497,15 +2497,15 @@ local function IsVisible(part)
     return #Camera:GetPartsObscuringTarget(castPoints, ignore) == 0
 end
 
--- // 3. BUSCADOR "ZERO WEAK POINTS" (FIX PRIORIDAD) // --
+-- // 3. BUSCADOR "NI UN PUNTO DÉBIL" (FIX APUNTADO) // --
 local function GetClosestPlayerLite()
     if tick() - lastSearch < 0.1 and targetPlayer and targetPlayer.Parent then 
         return targetPlayer, targetPart 
     end
     lastSearch = tick()
 
-    local target, bestPart = nil, nil
-    local maxDist = _G.Z_Aimbot_FOV
+    local target, bestPartFound = nil, nil
+    local maxDist = _G.Z_Aimbot_FOV or 150
     local center = GetCenter()
 
     for _, p in pairs(Players:GetPlayers()) do
@@ -2516,7 +2516,7 @@ local function GetClosestPlayerLite()
             if hum and hum.Health > 0 then
                 if _G.Z_Aimbot_TeamCheck and p.Team == LocalPlayer.Team then continue end
                 
-                -- Escaneamos para detección inicial
+                -- Escaneamos TODO el cuerpo para detección
                 for _, pName in pairs(BodyParts) do
                     local obj = char:FindFirstChild(pName)
                     if obj and obj:IsA("BasePart") then
@@ -2524,15 +2524,15 @@ local function GetClosestPlayerLite()
                         if onScreen then
                             local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                             if dist < maxDist then
-                                -- ⚡ PRIORIDAD: Si tu parte elegida (ej. Head) es visible, clávate ahí
+                                -- ⚡ PRIORIDAD DE APUNTADO: Buscamos la parte del menú (ej: Head)
                                 local chosen = char:FindFirstChild(_G.Z_Aimbot_Part)
                                 if chosen and IsVisible(chosen) then
                                     maxDist = dist
                                     target = p
-                                    targetPart = chosen
-                                    break -- Ya encontramos el mejor punto
+                                    targetPart = chosen -- Se clava en la cabeza
+                                    break 
                                 elseif IsVisible(obj) then
-                                    -- Si la cabeza no se ve, pero el brazo sí, apunta al brazo
+                                    -- Si la cabeza no se ve, pero el brazo sí, se clava al brazo
                                     maxDist = dist
                                     target = p
                                     targetPart = obj
@@ -2548,20 +2548,21 @@ local function GetClosestPlayerLite()
     return target, targetPart
 end
 
--- // 4. MOTOR DE RENDER (DIBUJO POR LÍNEAS - TOTAL FIX) // --
+-- // 4. MOTOR DE RENDER (FIX TOTAL DE LÍNEAS) // --
 RunService.RenderStepped:Connect(function()
     local center = GetCenter()
     local fov = _G.Z_Aimbot_FOV or 150
     local isVisible = _G.Z_Aimbot_ShowFOV and _G.Z_Aimbot_Active
     
-    -- Apagamos todas las líneas primero
+    -- Apagamos todas las líneas para limpiar
     for _, l in pairs(FOVLines) do l.Visible = false end
 
     if isVisible then
         local shape = _G.Z_FOV_Shape or "Circulo"
         
+        -- DIBUJAR CÍRCULO CON LÍNEAS (Para que se vea en móvil)
         if shape == "Circulo" then
-            local sides = 16 -- Un círculo de 16 líneas para que no de lag
+            local sides = 16 
             for i = 1, sides do
                 local l = FOVLines[i]
                 local a1 = math.rad((i - 1) * (360/sides))
@@ -2570,8 +2571,9 @@ RunService.RenderStepped:Connect(function()
                 l.To = center + Vector2.new(math.cos(a2) * fov, math.sin(a2) * fov)
                 l.Visible = true
             end
+            
+        -- DIBUJAR CUADRADO CON LÍNEAS (Para que se vea en móvil)
         elseif shape == "Cuadrado" then
-            -- Solo usamos 4 líneas
             local p1 = center + Vector2.new(-fov, -fov)
             local p2 = center + Vector2.new(fov, -fov)
             local p3 = center + Vector2.new(fov, fov)
@@ -2581,6 +2583,8 @@ RunService.RenderStepped:Connect(function()
             FOVLines[2].From = p2; FOVLines[2].To = p3; FOVLines[2].Visible = true
             FOVLines[3].From = p3; FOVLines[3].To = p4; FOVLines[3].Visible = true
             FOVLines[4].From = p4; FOVLines[4].To = p1; FOVLines[4].Visible = true
+            
+        -- DIBUJAR ESTRELLA (La que ya te jalaba)
         elseif shape == "Estrella" then
             local points = {}
             for i = 1, 10 do
@@ -2590,14 +2594,12 @@ RunService.RenderStepped:Connect(function()
             end
             for i = 1, 10 do
                 local l = FOVLines[i]
-                l.From = points[i]
-                l.To = points[i % 10 + 1]
-                l.Visible = true
+                l.From = points[i]; l.To = points[i % 10 + 1]; l.Visible = true
             end
         end
     end
 
-    -- Motor Aimbot
+    -- MOTOR AIMBOT (CONEXIÓN LITE)
     if _G.Z_Aimbot_Active then
         local t, tP = GetClosestPlayerLite()
         if t and tP then
