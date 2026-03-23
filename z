@@ -1844,38 +1844,43 @@ CombatTab:Toggle({ Title = "Mostrar FOV", Value = _G.Z_Aimbot_ShowFOV, Callback 
 
 
 
-
 -- // VARIABLES PARA GUN MODS // --
 _G.Z_NoRecoil = false
 _G.Z_InfAmmo = false
 
 CombatTab:Section({ Title = "Gun Modifications (OP)" })
 
--- Botón No Recoil
-CombatTab:Toggle({
-    Title = "No Recoil / No Spread",
-    Desc = "Tus balas van directo a un punto (Láser).",
-    Value = _G.Z_NoRecoil,
-    Callback = function(state)
-        _G.Z_NoRecoil = state
+-- 1. Botón Balas Infinitas (ARRIBA)
+CombatTab:Button({
+    Title = "Munición Infinita",
+    Desc = "Haz click para activar/desactivar (999k Balas).",
+    Callback = function()
+        _G.Z_InfAmmo = not _G.Z_InfAmmo -- Cambia el estado internamente
+        
+        -- Sonido Premium
+        if PlayToggleSound then PlayToggleSound() end 
+        
         WindUI:Notify({
             Title = "Z-Weapon",
-            Content = state and "Recoil Eliminado" or "Recoil Normal",
+            Content = _G.Z_InfAmmo and "Balas Infinitas: ACTIVADO" or "Balas Infinitas: DESACTIVADO",
             Time = 2
         })
     end
 })
 
--- Botón Balas Infinitas
-CombatTab:Toggle({
-    Title = "Munición Infinita",
-    Desc = "Nunca recargas y tienes balas 999k.",
-    Value = _G.Z_InfAmmo,
-    Callback = function(state)
-        _G.Z_InfAmmo = state
+-- 2. Botón No Recoil (ABAJO)
+CombatTab:Button({
+    Title = "No Recoil / No Spread",
+    Desc = "Haz click para activar/desactivar el modo Láser.",
+    Callback = function()
+        _G.Z_NoRecoil = not _G.Z_NoRecoil -- Cambia el estado internamente
+        
+        -- Sonido Premium
+        if PlayToggleSound then PlayToggleSound() end
+
         WindUI:Notify({
             Title = "Z-Weapon",
-            Content = state and "Balas Infinitas ON" or "Balas Normales",
+            Content = _G.Z_NoRecoil and "No Recoil: ACTIVADO" or "No Recoil: DESACTIVADO",
             Time = 2
         })
     end
