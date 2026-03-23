@@ -1363,94 +1363,109 @@ end)
 
 
 
-
-
--- // 🚀 MOTOR GUN-MODS LITE (FPS BOOST EDITION) // --
+-- // 🧠 MOTOR HI-POINT & ACS PRO (ULTRA PRECISION) // --
 
 local lastWeaponUpdate = 0
-local lastPhysicalUpdate = 0
 local Originals = {}
 
-local function PatchWeaponsLite()
-    -- Si nada está activo, ni nos molestamos en abrir el getgc
-    if not (_G.Z_NoRecoil or _G.Z_InfAmmo) then return end
-    
+local function PatchWeapons()
     for _, v in pairs(getgc(true)) do
         if type(v) == "table" then
-            -- --- NO RECOIL LITE ---
-            if _G.Z_NoRecoil and (rawget(v, "camRecoil") or rawget(v, "gunRecoil") or rawget(v, "RecoilPowerStepAmount")) then
-                if not Originals[v] then
-                    Originals[v] = {
-                        MinSpread = v.MinSpread, MaxSpread = v.MaxSpread,
-                        MinRecoilPower = v.MinRecoilPower, MaxRecoilPower = v.MaxRecoilPower,
-                        Recoil = v.Recoil
-                    }
-                end
+            
+            -- --- 4. NO RECOIL & NO SPREAD (FIX PARA EL BAILOTEO DE BALAS) ---
+            -- Buscamos si la tabla tiene datos de Recoil o Spread
+            if rawget(v, "camRecoil") or rawget(v, "gunRecoil") or rawget(v, "RecoilPowerStepAmount") then
+                if _G.Z_NoRecoil then
+                    -- Respaldamos originales para poder apagarlo luego
+                    if not Originals[v] then
+                        Originals[v] = {
+                            MinSpread = v.MinSpread,
+                            MaxSpread = v.MaxSpread,
+                            MinRecoilPower = v.MinRecoilPower,
+                            MaxRecoilPower = v.MaxRecoilPower,
+                            Recoil = v.Recoil
+                        }
+                    end
 
-                v.MinSpread = 0; v.MaxSpread = 0
-                v.AimInaccuracyStepAmount = 0
-                v.AimInaccuracyDecrease = 10
-                v.MinRecoilPower = 0; v.MaxRecoilPower = 0
-                v.RecoilPowerStepAmount = 0; v.Recoil = 0
+                    -- [[ LÓGICA ULTRA OP ]] --
+                    v.MinSpread = 0
+                    v.MaxSpread = 0
+                    v.AimInaccuracyStepAmount = 0
+                    v.AimInaccuracyDecrease = 10 -- Recuperación instantánea
+                    
+                    v.MinRecoilPower = 0
+                    v.MaxRecoilPower = 0
+                    v.RecoilPowerStepAmount = 0
+                    v.Recoil = 0 -- Variable estándar
 
-                if v.camRecoil then
-                    v.camRecoil.camRecoilUp = {0,0}; v.camRecoil.camRecoilTilt = {0,0}
-                    v.camRecoil.camRecoilLeft = {0,0}; v.camRecoil.camRecoilRight = {0,0}
+                    -- Reseteamos los ángulos de cámara (ACS / Hi-Point)
+                    if v.camRecoil then
+                        v.camRecoil.camRecoilUp = {0,0}
+                        v.camRecoil.camRecoilTilt = {0,0}
+                        v.camRecoil.camRecoilLeft = {0,0}
+                        v.camRecoil.camRecoilRight = {0,0}
+                    end
+                    -- Reseteamos los ángulos del arma
+                    if v.gunRecoil then
+                        v.gunRecoil.gunRecoilUp = {0,0}
+                        v.gunRecoil.gunRecoilTilt = {0,0}
+                        v.gunRecoil.gunRecoilLeft = {0,0}
+                        v.gunRecoil.gunRecoilRight = {0,0}
+                        v.gunRecoil.DownPunch = 0
+                    end
+                else
+                    -- SI EL HACK ESTÁ OFF: Restauramos valores
+                    if Originals[v] then
+                        v.MinSpread = Originals[v].MinSpread
+                        v.MaxSpread = Originals[v].MaxSpread
+                        v.MinRecoilPower = Originals[v].MinRecoilPower
+                        v.MaxRecoilPower = Originals[v].MaxRecoilPower
+                        v.Recoil = Originals[v].Recoil
+                        -- No limpiamos Originals[v] aquí por si falta el Inf Ammo
+                    end
                 end
-                if v.gunRecoil then
-                    v.gunRecoil.gunRecoilUp = {0,0}; v.gunRecoil.gunRecoilTilt = {0,0}
-                    v.gunRecoil.gunRecoilLeft = {0,0}; v.gunRecoil.gunRecoilRight = {0,0}
-                    v.gunRecoil.DownPunch = 0
-                end
-            elseif not _G.Z_NoRecoil and Originals[v] then
-                -- Restauración rápida
-                v.MinSpread = Originals[v].MinSpread; v.MaxSpread = Originals[v].MaxSpread
-                v.MinRecoilPower = Originals[v].MinRecoilPower; v.MaxRecoilPower = Originals[v].MaxRecoilPower
-                v.Recoil = Originals[v].Recoil
             end
             
-            -- --- INF AMMO LITE ---
-            if _G.Z_InfAmmo and (rawget(v, "AmmoInGun") or rawget(v, "MaxStoredAmmo") or rawget(v, "Ammo")) then
-                v.AmmoInGun = 999999; v.Ammo = 999999
-                v.StoredAmmo = 999999; v.MaxStoredAmmo = 999999 
-                if rawget(v, "Jammed") ~= nil then v.Jammed = false end
+            -- --- LÓGICA INF AMMO (FIX PARA HI-POINT / ACS) ---
+            if rawget(v, "AmmoInGun") or rawget(v, "MaxStoredAmmo") or rawget(v, "Ammo") then
+                if _G.Z_InfAmmo then
+                    v.AmmoInGun = math.huge 
+                    v.Ammo = math.huge
+                    v.StoredAmmo = math.huge
+                    v.MaxStoredAmmo = math.huge 
+                    if rawget(v, "Jammed") ~= nil then v.Jammed = false end
+                end
             end
+
+            -- Limpieza de memoria si ambos están apagados
+            if not _G.Z_NoRecoil and not _G.Z_InfAmmo then Originals[v] = nil end
         end
     end
 end
 
--- // LOOP MAESTRO LITE // --
-RunService.Heartbeat:Connect(function()
-    local currentTime = tick()
-
-    -- 1. Escaneo de Memoria (Súper Lento: cada 3 seg)
-    -- Es suficiente para detectar cuando cambias de arma o reapareces
-    if currentTime - lastWeaponUpdate > 3 then
-        lastWeaponUpdate = currentTime
-        pcall(PatchWeaponsLite)
-    end
-
-    -- 2. Sync de Objetos Físicos (Cada 0.5 seg)
-    -- Solo corre si tienes munición infinita activada
-    if _G.Z_InfAmmo and (currentTime - lastPhysicalUpdate > 0.5) then
-        lastPhysicalUpdate = currentTime
-        local char = LocalPlayer.Character
-        local tool = char and char:FindFirstChildOfClass("Tool")
+-- Loop de ejecución (0.2s para respuesta inmediata)
+game:GetService("RunService").Heartbeat:Connect(function()
+    if tick() - lastWeaponUpdate > 0.2 then
+        lastWeaponUpdate = tick()
         
-        if tool then
-            for _, obj in pairs(tool:GetDescendants()) do
-                if (obj:IsA("IntValue") or obj:IsA("NumberValue")) then
-                    local n = obj.Name:lower()
-                    if n:find("ammo") or n:find("gun") or n:find("mag") then
-                        obj.Value = 999999 
+        pcall(PatchWeapons)
+        
+        -- Truco para objetos físicos en la Hi-Point (Visual)
+        if _G.Z_InfAmmo then
+            local char = game.Players.LocalPlayer.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            if tool then
+                for _, obj in pairs(tool:GetDescendants()) do
+                    if (obj:IsA("IntValue") or obj:IsA("NumberValue")) then
+                        local n = obj.Name:lower()
+                        if n:find("ammo") or n:find("gun") or n:find("mag") then
+                            obj.Value = 999999 
+                        end
                     end
                 end
             end
         end
     end
-    
-    -- Limpieza de memoria muerta
-    if not _G.Z_NoRecoil and not _G.Z_InfAmmo then Originals = {} end
 end)
 
 
