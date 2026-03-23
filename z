@@ -2447,33 +2447,72 @@ RenderTab:Input({
 
 
 
--- // 🧠 LOS CEREBROS (LÓGICA FINAL) // --
+-- // VARIABLES DE SERVICIO // --
+local GuiService = game:GetService("GuiService")
 
+-- Visual del FOV Mejorado
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1.5
+FOVCircle.Thickness = 2
 FOVCircle.Color = Color3.fromHex("#30FF6A")
 FOVCircle.Filled = false
-FOVCircle.Transparency = 0.8
+FOVCircle.Transparency = 0.9
 
-local function IsVisible(targetPart)
-    if not _G.Z_Aimbot_WallCheck then return true end
-    local parts = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, targetPart.Parent})
-    return #parts == 0
+-- // 1. CENTRO EXACTO (FIX PC/VELOCITY) // --
+local function GetCenter()
+    local vps = Camera.ViewportSize
+    local inset = GuiService:GetGuiInset()
+    return Vector2.new(vps.X / 2, (vps.Y / 2) + (inset.Y / 2))
 end
 
+-- // 2. WALL CHECK PRO (RAYCAST VECTORIAL) // --
+local function IsVisible(targetPart)
+    if not _G.Z_Aimbot_WallCheck then return true end
+    
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local rayParam = RaycastParams.new()
+    rayParam.FilterType = Enum.RaycastFilterType.Exclude
+    -- Ignoramos nuestro personaje y el modelo del enemigo para que no choque consigo mismo
+    rayParam.FilterDescendantsInstances = {char, targetPart.Parent} 
+    
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * 1000
+    local ray = workspace:Raycast(origin, direction, rayParam)
+    
+    return not ray -- Si no hay nada estorbando, es visible
+end
+
+-- // 3. BUSCADOR CON ANTI-BOT Y FILTRO DE "FANTASMAS" // --
 local function GetClosestPlayer()
     local target = nil
     local maxDist = _G.Z_Aimbot_FOV
+    local center = GetCenter()
+
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(_G.Z_Aimbot_Part) then
-            if _G.Z_Aimbot_TeamCheck and p.Team == LocalPlayer.Team then continue end
-            local part = p.Character[_G.Z_Aimbot_Part]
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                if dist < maxDist and IsVisible(part) then
-                    maxDist = dist
-                    target = p
+        -- 🛡️ ESCUDO ANTI-BOT Y FILTRO DE VIDA
+        if p ~= LocalPlayer and p.Character then
+            local char = p.Character
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local part = char:FindFirstChild(_G.Z_Aimbot_Part)
+            local root = char:FindFirstChild("HumanoidRootPart")
+
+            -- Solo apunta si: Tiene vida, no es invisible (Anti-Bot), y existe físicamente
+            if hum and hum.Health > 0 and part and root then
+                -- Filtro Anti-Bot: Ignora jugadores sospechosamente invisibles o sin ID real
+                if part.Transparency >= 1 or root.Transparency >= 1 then continue end
+                
+                -- Team Check
+                if _G.Z_Aimbot_TeamCheck and p.Team == LocalPlayer.Team then continue end
+                
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < maxDist and IsVisible(part) then
+                        maxDist = dist
+                        target = p
+                    end
                 end
             end
         end
@@ -2481,18 +2520,32 @@ local function GetClosestPlayer()
     return target
 end
 
-RunService.RenderStepped:Connect(function()
+-- // 4. MOTOR DE APUNTADO (PRIORIDAD LEVEL 7) // --
+RunService:BindToRenderStep("Z_EPT_ULTIMATE_CORE", Enum.RenderPriority.Camera.Value + 1, function(delta)
+    local center = GetCenter()
+    
     -- Sync FOV
     FOVCircle.Radius = _G.Z_Aimbot_FOV
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Position = center
     FOVCircle.Visible = _G.Z_Aimbot_ShowFOV and _G.Z_Aimbot_Active
 
-    -- Motor Aimbot
     if _G.Z_Aimbot_Active then
         local t = GetClosestPlayer()
         if t and t.Character and t.Character:FindFirstChild(_G.Z_Aimbot_Part) then
-            local lookAt = CFrame.new(Camera.CFrame.Position, t.Character[_G.Z_Aimbot_Part].Position)
-            Camera.CFrame = Camera.CFrame:Lerp(lookAt, 1 / _G.Z_Aimbot_Smoothing)
+            local targetPart = t.Character[_G.Z_Aimbot_Part]
+            
+            -- PREDICCIÓN DE MOVIMIENTO (Para 3000 Speed)
+            local vel = t.Character.HumanoidRootPart.AssemblyLinearVelocity
+            -- Predicción suavizada para no dar tirones al cielo
+            local prediction = Vector3.new(vel.X, vel.Y * 0.05, vel.Z) * 0.135
+            
+            local lookAt = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position + prediction)
+            
+            -- Smoothing Dinámico (Zero Jitter)
+            local smooth = math.max(_G.Z_Aimbot_Smoothing, 1)
+            local factor = math.clamp(1 / (smooth * delta * 60), 0, 1)
+            
+            Camera.CFrame = Camera.CFrame:Lerp(lookAt, factor)
         end
     end
 end)
