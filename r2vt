@@ -2462,55 +2462,42 @@ RenderTab:Input({
 
 
 
--- // 🛠️ SERVICIOS Y CONFIGURACIÓN LITE // --
+-- // 🛠️ CONFIGURACIÓN DE LÍNEAS UNIVERSALES (FPS LITE) // --
 local GuiService = game:GetService("GuiService")
 local lastSearch = 0
 local targetPlayer = nil
 local targetPart = nil
 
--- Partes para detección (Ni un punto débil)
-local BodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
-
--- // CONFIGURACIÓN DE DIBUJO (UNIVERSAL) // --
-local FOVSquare = Drawing.new("Square")
-FOVSquare.Thickness = 2; FOVSquare.Filled = false; FOVSquare.Transparency = 0.8; FOVSquare.Visible = false
-
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2; FOVCircle.Filled = false; FOVCircle.Transparency = 0.8; FOVCircle.Visible = false
-
-local StarLines = {}
-for i = 1, 10 do
+-- Creamos un grupo de 16 líneas (Alcanza para Círculo, Cuadrado y Estrella)
+local FOVLines = {}
+for i = 1, 16 do
     local l = Drawing.new("Line")
-    l.Thickness = 2; l.Transparency = 0.8; l.Visible = false
-    table.insert(StarLines, l)
+    l.Thickness = 2
+    l.Transparency = 0.8
+    l.Color = Color3.fromHex("#30FF6A")
+    l.Visible = false
+    table.insert(FOVLines, l)
 end
 
--- // 1. FUNCIÓN: CENTRO REAL (FIX MÓVIL/PC) // --
+local BodyParts = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
+
+-- // 1. CENTRO REAL (FIX IPHONE/PC) // --
 local function GetCenter()
     local vps = Camera.ViewportSize
     local inset = GuiService:GetGuiInset()
-    -- Este cálculo es vital para que en iPhone no salga movido el FOV
     return Vector2.new(vps.X / 2, vps.Y / 2 + (inset.Y / 2))
 end
 
--- // 2. WALL CHECK (RAYCAST LITE UNIVERSAL) // --
+-- // 2. WALL CHECK LITE // --
 local function IsVisible(part)
     if not _G.Z_Aimbot_WallCheck then return true end
-    local char = LocalPlayer.Character
-    if not char or not part then return false end
-    
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {char, part.Parent}
-    
-    local origin = Camera.CFrame.Position
-    local dir = (part.Position - origin).Unit * 1000
-    local result = workspace:Raycast(origin, dir, params)
-    
-    return result == nil
+    if not part then return false end
+    local castPoints = {part.Position}
+    local ignore = {LocalPlayer.Character, part.Parent}
+    return #Camera:GetPartsObscuringTarget(castPoints, ignore) == 0
 end
 
--- // 3. BUSCADOR INTELIGENTE (FIX TARGETING) // --
+-- // 3. BUSCADOR "ZERO WEAK POINTS" (FIX PRIORIDAD) // --
 local function GetClosestPlayerLite()
     if tick() - lastSearch < 0.1 and targetPlayer and targetPlayer.Parent then 
         return targetPlayer, targetPart 
@@ -2529,7 +2516,7 @@ local function GetClosestPlayerLite()
             if hum and hum.Health > 0 then
                 if _G.Z_Aimbot_TeamCheck and p.Team == LocalPlayer.Team then continue end
                 
-                -- Escaneo para detección (Cualquier parte)
+                -- Escaneamos para detección inicial
                 for _, pName in pairs(BodyParts) do
                     local obj = char:FindFirstChild(pName)
                     if obj and obj:IsA("BasePart") then
@@ -2537,17 +2524,18 @@ local function GetClosestPlayerLite()
                         if onScreen then
                             local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                             if dist < maxDist then
-                                -- ⚡ BUG FIX: Detectamos por cercanía, pero APUNTAMOS a lo que diga el menú
-                                local chosenPart = char:FindFirstChild(_G.Z_Aimbot_Part)
-                                if chosenPart and IsVisible(chosenPart) then
+                                -- ⚡ PRIORIDAD: Si tu parte elegida (ej. Head) es visible, clávate ahí
+                                local chosen = char:FindFirstChild(_G.Z_Aimbot_Part)
+                                if chosen and IsVisible(chosen) then
                                     maxDist = dist
                                     target = p
-                                    targetPart = chosenPart -- <--- AQUÍ SE CLAVA EN LA CABEZA
+                                    targetPart = chosen
+                                    break -- Ya encontramos el mejor punto
                                 elseif IsVisible(obj) then
-                                    -- Fallback si la cabeza está tapada pero el brazo no
+                                    -- Si la cabeza no se ve, pero el brazo sí, apunta al brazo
                                     maxDist = dist
                                     target = p
-                                    targetPart = obj 
+                                    targetPart = obj
                                 end
                             end
                         end
@@ -2560,47 +2548,60 @@ local function GetClosestPlayerLite()
     return target, targetPart
 end
 
--- // 4. MOTOR DE RENDER Y FOV (FIX MÓVIL) // --
+-- // 4. MOTOR DE RENDER (DIBUJO POR LÍNEAS - TOTAL FIX) // --
 RunService.RenderStepped:Connect(function()
     local center = GetCenter()
     local fov = _G.Z_Aimbot_FOV or 150
     local isVisible = _G.Z_Aimbot_ShowFOV and _G.Z_Aimbot_Active
-    local color = Color3.fromHex("#30FF6A")
+    
+    -- Apagamos todas las líneas primero
+    for _, l in pairs(FOVLines) do l.Visible = false end
 
-    -- Reset de formas
-    FOVSquare.Visible = false; FOVCircle.Visible = false
-    for _, l in pairs(StarLines) do l.Visible = false end
-
-    -- Dibujar FOV (PC/MOBILE)
     if isVisible then
-        if _G.Z_FOV_Shape == "Cuadrado" then
-            FOVSquare.Visible = true; FOVSquare.Color = color
-            FOVSquare.Size = Vector2.new(fov * 2, fov * 2)
-            FOVSquare.Position = Vector2.new(center.X - fov, center.Y - fov)
-        elseif _G.Z_FOV_Shape == "Circulo" or _G.Z_FOV_Shape == nil then
-            FOVCircle.Visible = true; FOVCircle.Color = color
-            FOVCircle.Radius = fov; FOVCircle.Position = center
-        elseif _G.Z_FOV_Shape == "Estrella" then
-            local p = {}
+        local shape = _G.Z_FOV_Shape or "Circulo"
+        
+        if shape == "Circulo" then
+            local sides = 16 -- Un círculo de 16 líneas para que no de lag
+            for i = 1, sides do
+                local l = FOVLines[i]
+                local a1 = math.rad((i - 1) * (360/sides))
+                local a2 = math.rad(i * (360/sides))
+                l.From = center + Vector2.new(math.cos(a1) * fov, math.sin(a1) * fov)
+                l.To = center + Vector2.new(math.cos(a2) * fov, math.sin(a2) * fov)
+                l.Visible = true
+            end
+        elseif shape == "Cuadrado" then
+            -- Solo usamos 4 líneas
+            local p1 = center + Vector2.new(-fov, -fov)
+            local p2 = center + Vector2.new(fov, -fov)
+            local p3 = center + Vector2.new(fov, fov)
+            local p4 = center + Vector2.new(-fov, fov)
+            
+            FOVLines[1].From = p1; FOVLines[1].To = p2; FOVLines[1].Visible = true
+            FOVLines[2].From = p2; FOVLines[2].To = p3; FOVLines[2].Visible = true
+            FOVLines[3].From = p3; FOVLines[3].To = p4; FOVLines[3].Visible = true
+            FOVLines[4].From = p4; FOVLines[4].To = p1; FOVLines[4].Visible = true
+        elseif shape == "Estrella" then
+            local points = {}
             for i = 1, 10 do
                 local r = (i % 2 == 0) and fov or (fov * 0.45)
                 local a = math.rad((i * 36) - 90)
-                table.insert(p, Vector2.new(center.X + math.cos(a) * r, center.Y + math.sin(a) * r))
+                table.insert(points, center + Vector2.new(math.cos(a) * r, math.sin(a) * r))
             end
             for i = 1, 10 do
-                local l = StarLines[i]
-                l.Visible = true; l.Color = color
-                l.From = p[i]; l.To = p[i % 10 + 1]
+                local l = FOVLines[i]
+                l.From = points[i]
+                l.To = points[i % 10 + 1]
+                l.Visible = true
             end
         end
     end
 
-    -- Motor Aimbot (Súper Smooth)
+    -- Motor Aimbot
     if _G.Z_Aimbot_Active then
         local t, tP = GetClosestPlayerLite()
         if t and tP then
             local lookAt = CFrame.new(Camera.CFrame.Position, tP.Position)
-            -- Lerp dinámico: se ajusta a tus FPS para no laggear
             Camera.CFrame = Camera.CFrame:Lerp(lookAt, 1 / _G.Z_Aimbot_Smoothing)
         end
     end
