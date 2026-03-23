@@ -1365,8 +1365,7 @@ end)
 
 
 
-
--- // 🧠 MOTOR HI-POINT ACS FIX (INSTANTÁNEO + VISUAL INF) // --
+-- // 🧠 MOTOR HI-POINT & ACS PRO (ULTRA PRECISION) // --
 
 local lastWeaponUpdate = 0
 local Originals = {}
@@ -1375,60 +1374,93 @@ local function PatchWeapons()
     for _, v in pairs(getgc(true)) do
         if type(v) == "table" then
             
-            -- --- LÓGICA NO RECOIL (Basado en camRecoil y gunRecoil de tu decompile) ---
-            if rawget(v, "camRecoil") or rawget(v, "gunRecoil") or rawget(v, "Recoil") then
+            -- --- 4. NO RECOIL & NO SPREAD (FIX PARA EL BAILOTEO DE BALAS) ---
+            -- Buscamos si la tabla tiene datos de Recoil o Spread
+            if rawget(v, "camRecoil") or rawget(v, "gunRecoil") or rawget(v, "RecoilPowerStepAmount") then
                 if _G.Z_NoRecoil then
-                    if not Originals[v] then Originals[v] = {Recoil = v.Recoil} end
-                    
-                    -- Limpiamos tablas de ACS
-                    if v.camRecoil then
-                        v.camRecoil.camRecoilUp = {0, 0}
-                        v.camRecoil.camRecoilTilt = {0, 0}
+                    -- Respaldamos originales para poder apagarlo luego
+                    if not Originals[v] then
+                        Originals[v] = {
+                            MinSpread = v.MinSpread,
+                            MaxSpread = v.MaxSpread,
+                            MinRecoilPower = v.MinRecoilPower,
+                            MaxRecoilPower = v.MaxRecoilPower,
+                            Recoil = v.Recoil
+                        }
                     end
+
+                    -- [[ LÓGICA ULTRA OP ]] --
+                    v.MinSpread = 0
+                    v.MaxSpread = 0
+                    v.AimInaccuracyStepAmount = 0
+                    v.AimInaccuracyDecrease = 10 -- Recuperación instantánea
+                    
+                    v.MinRecoilPower = 0
+                    v.MaxRecoilPower = 0
+                    v.RecoilPowerStepAmount = 0
+                    v.Recoil = 0 -- Variable estándar
+
+                    -- Reseteamos los ángulos de cámara (ACS / Hi-Point)
+                    if v.camRecoil then
+                        v.camRecoil.camRecoilUp = {0,0}
+                        v.camRecoil.camRecoilTilt = {0,0}
+                        v.camRecoil.camRecoilLeft = {0,0}
+                        v.camRecoil.camRecoilRight = {0,0}
+                    end
+                    -- Reseteamos los ángulos del arma
                     if v.gunRecoil then
-                        v.gunRecoil.gunRecoilUp = {0, 0}
+                        v.gunRecoil.gunRecoilUp = {0,0}
+                        v.gunRecoil.gunRecoilTilt = {0,0}
+                        v.gunRecoil.gunRecoilLeft = {0,0}
+                        v.gunRecoil.gunRecoilRight = {0,0}
                         v.gunRecoil.DownPunch = 0
                     end
-                    -- Variables estándar
-                    v.Recoil = 0
-                    v.Spread = 0
-                    v.MaxSpread = 0
-                    if rawget(v, "MinSpread") then v.MinSpread = 0 end
+                else
+                    -- SI EL HACK ESTÁ OFF: Restauramos valores
+                    if Originals[v] then
+                        v.MinSpread = Originals[v].MinSpread
+                        v.MaxSpread = Originals[v].MaxSpread
+                        v.MinRecoilPower = Originals[v].MinRecoilPower
+                        v.MaxRecoilPower = Originals[v].MaxRecoilPower
+                        v.Recoil = Originals[v].Recoil
+                        -- No limpiamos Originals[v] aquí por si falta el Inf Ammo
+                    end
                 end
             end
             
             -- --- LÓGICA INF AMMO (FIX PARA HI-POINT / ACS) ---
             if rawget(v, "AmmoInGun") or rawget(v, "MaxStoredAmmo") or rawget(v, "Ammo") then
                 if _G.Z_InfAmmo then
-                    -- METEMOS EL INFINITO REAL PARA QUE DIGA "inf" EN EL HUD
-                    v.AmmoInGun = math.huge -- Esto pone el "inf" instantáneo
+                    v.AmmoInGun = math.huge 
                     v.Ammo = math.huge
                     v.StoredAmmo = math.huge
                     v.MaxStoredAmmo = math.huge 
-                    
                     if rawget(v, "Jammed") ~= nil then v.Jammed = false end
                 end
             end
+
+            -- Limpieza de memoria si ambos están apagados
+            if not _G.Z_NoRecoil and not _G.Z_InfAmmo then Originals[v] = nil end
         end
     end
 end
 
--- Loop de ejecución acelerado (0.2s para que sea más "en corto" que el de 0.4s)
+-- Loop de ejecución (0.2s para respuesta inmediata)
 game:GetService("RunService").Heartbeat:Connect(function()
     if tick() - lastWeaponUpdate > 0.2 then
         lastWeaponUpdate = tick()
         
         pcall(PatchWeapons)
         
-        -- Truco para objetos físicos en la Hi-Point
+        -- Truco para objetos físicos en la Hi-Point (Visual)
         if _G.Z_InfAmmo then
-            local tool = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Hi-Point")
+            local char = game.Players.LocalPlayer.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
             if tool then
                 for _, obj in pairs(tool:GetDescendants()) do
                     if (obj:IsA("IntValue") or obj:IsA("NumberValue")) then
                         local n = obj.Name:lower()
                         if n:find("ammo") or n:find("gun") or n:find("mag") then
-                            -- Forzamos un número grande para que el motor visual no se trabe
                             obj.Value = 999999 
                         end
                     end
@@ -1437,7 +1469,6 @@ game:GetService("RunService").Heartbeat:Connect(function()
         end
     end
 end)
-
 
 
 
