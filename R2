@@ -1,0 +1,489 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris") 
+local Stats = game:GetService("Stats")
+local Workspace = game:GetService("Workspace")
+
+--// 2. VARIABLES DE ENTORNO //--
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
+
+local cloneref = (cloneref or clonereference or function(instance) return instance end)
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+
+-- // FUNCIÓN MAESTRA: GENERADOR DE ACCESOS RÁPIDOS Z-NORESTE // --
+local function CreateQuickButton(Name, VariableName, IconID)
+    -- Verificar si ya existe
+    if game.CoreGui:FindFirstChild("Z_Widget_"..Name) then return end
+
+    local Z_WidgetGui = Instance.new("ScreenGui", game.CoreGui)
+    Z_WidgetGui.Name = "Z_Widget_"..Name
+    
+    local Holder = Instance.new("Frame", Z_WidgetGui)
+    Holder.Size = UDim2.new(0, 115, 0, 35)
+    Holder.Position = UDim2.new(0.5, -57, 0.2, 0) 
+    Holder.BackgroundTransparency = 1 
+
+    local MainBtn = Instance.new("TextButton", Holder)
+    MainBtn.Size = UDim2.new(1, 0, 1, 0)
+    MainBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    MainBtn.BackgroundTransparency = 0.25 
+    MainBtn.Text = "" 
+    MainBtn.ClipsDescendants = true
+    Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 8)
+
+    -- [LAYOUT E ICONOS IGUAL QUE ANTES]
+    local Layout = Instance.new("UIListLayout", MainBtn)
+    Layout.FillDirection = "Horizontal"
+    Layout.HorizontalAlignment = "Center"
+    Layout.VerticalAlignment = "Center"
+    Layout.Padding = UDim.new(0, 6)
+
+    local Icon = Instance.new("ImageLabel", MainBtn)
+    Icon.BackgroundTransparency = 1
+    Icon.Size = UDim2.new(0, 18, 0, 18)
+    Icon.Image = "rbxassetid://"..tostring(IconID)
+
+    local TextLabel = Instance.new("TextLabel", MainBtn)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.AutomaticSize = "XY"
+    TextLabel.Text = Name:upper()
+    TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 10
+
+    local RainbowStroke = Instance.new("UIStroke", MainBtn)
+    RainbowStroke.Thickness = 2.2
+    local UIGradient = Instance.new("UIGradient", RainbowStroke)
+    UIGradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))})
+
+    task.spawn(function()
+        local angle = 0
+        game:GetService("RunService").RenderStepped:Connect(function()
+            angle = angle + 3 
+            UIGradient.Rotation = angle
+            local isActive = _G[VariableName]
+            TextLabel.TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+            Icon.ImageColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+        end)
+    end)
+
+    -- // EVENTO DE CLICK (SÓLO PARA ACTIVAR) // --
+    MainBtn.MouseButton1Click:Connect(function()
+        _G[VariableName] = not _G[VariableName]
+        _G.Z_Force_Reset = true 
+        
+        local s = Instance.new("Sound", game.SoundService)
+        s.SoundId = "rbxassetid://120401943587131"
+        s:Play()
+    end)
+
+    -- // LÓGICA DRAGGABLE MEJORADA (PC & MÓVIL) // --
+    local dragging = false
+    local isPressing = false
+    local dragStart, startPos, holdStartTime
+    local holdThreshold = 0.35 -- Tiempo para que empiece a arrastrar
+
+    MainBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isPressing = true
+            holdStartTime = tick()
+            dragStart = input.Position
+            startPos = Holder.Position
+        end
+    end)
+
+    -- Usamos UserInputService global para detectar el movimiento aunque el mouse se salga del botón
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if isPressing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            -- Solo activamos el drag si se ha mantenido presionado el tiempo suficiente
+            if (tick() - holdStartTime) >= holdThreshold then
+                dragging = true
+                local delta = input.Position - dragStart
+                Holder.Position = UDim2.new(
+                    startPos.X.Scale, 
+                    startPos.X.Offset + delta.X, 
+                    startPos.Y.Scale, 
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+    end)
+
+    -- EL FIX REAL: Resetear todo cuando sueltas el click
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isPressing = false
+            dragging = false
+            holdStartTime = 0
+        end
+    end)
+end
+
+
+
+
+
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+    
+    if ok then
+        WindUI = result
+    else 
+        if cloneref(game:GetService("RunService")):IsStudio() then
+            WindUI = require(cloneref(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init")))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/32%24"))()
+        end
+    end
+end
+
+-- */  Window  /* --
+local Window = WindUI:CreateWindow({
+    Title = "ZBeta v1.0  |  El Paso Texas.",
+    Author = "By  •  @znoreste",
+    Folder = "Z_EPT_Configs", -- CAMBIADO: Sin caracteres raros para que no de error
+    Icon = "solar:incognito-broken", -- El icono se queda igual, este no da error
+    Theme = "Dark",
+    NewElements = true,
+    HideSearchBar = false,
+    
+    OpenButton = {
+        Title = "Z - EPT",
+        CornerRadius = UDim.new(1,0),
+        StrokeThickness = 3,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.8,
+        
+        Color = ColorSequence.new(
+            Color3.fromHex("#e53935"), 
+            Color3.fromHex("#e53935")
+        )
+    },
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Default",
+    },
+})
+
+do
+    Window:Tag({
+        Title = "AntiBan: ON",
+        Icon = "solar:shield-bold-duotone",
+        Color = Color3.fromHex("#1c1c1c"),
+        Border = true,
+    })
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // 🚀 CEREBRO: VEHICLE FLY "REAL GOD" (BODY MOVERS) // --
+local RunService = game:GetService("RunService")
+local LocalPlayer = game.Players.LocalPlayer
+
+-- Variables para los soportes físicos
+local b_vel = nil
+local b_gyro = nil
+
+local function lerp(a, b, t)
+    return a + (b - a) * t
+end
+
+-- Función para limpiar los soportes al bajar o apagar
+local function CleanMovers()
+    if b_vel then b_vel:Destroy(); b_vel = nil end
+    if b_gyro then b_gyro:Destroy(); b_gyro = nil end
+end
+
+RunService.RenderStepped:Connect(function()
+    -- Reset si el hack está apagado
+    if not _G.Z_Vehicle_Active then 
+        CleanMovers()
+        if workspace.CurrentCamera.FieldOfView ~= 70 then
+            workspace.CurrentCamera.FieldOfView = lerp(workspace.CurrentCamera.FieldOfView, 70, 0.1)
+        end
+        return 
+    end
+    
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local camera = workspace.CurrentCamera
+
+    if hum and hum.SeatPart and hum.SeatPart:IsA("VehicleSeat") then
+        local seat = hum.SeatPart
+        local speed = _G.Z_Vehicle_Speed or 50
+        
+        -- 🛡️ CREAR SOPORTES SI NO EXISTEN
+        if not b_vel then
+            b_vel = Instance.new("BodyVelocity")
+            b_vel.MaxForce = Vector3.new(1, 1, 1) * math.huge
+            b_vel.Velocity = Vector3.new(0, 0, 0)
+            b_vel.Parent = seat
+        end
+        
+        if not b_gyro then
+            b_gyro = Instance.new("BodyGyro")
+            b_gyro.MaxTorque = Vector3.new(1, 1, 1) * math.huge
+            b_gyro.D = 500 -- Suavizado de giro
+            b_gyro.P = 3000 -- Fuerza de estabilidad
+            b_gyro.CFrame = seat.CFrame
+            b_gyro.Parent = seat
+        end
+
+        -- 🔥 MOTOR FLY REAL 🔥
+        
+        -- 1. FIJAR ROTACIÓN (Gira con la cámara pero siempre NIVELADO)
+        local camLook = camera.CFrame.LookVector
+        local flatLook = Vector3.new(camLook.X, 0, camLook.Z).Unit
+        b_gyro.CFrame = CFrame.new(seat.Position, seat.Position + flatLook)
+
+        if seat.Throttle ~= 0 then
+            -- 2. MOVIMIENTO HACIA DONDE VES
+            local moveDir = camera.CFrame.LookVector
+            if seat.Throttle == -1 then moveDir = -moveDir end
+            
+            b_vel.Velocity = moveDir * speed
+            
+            -- FOV de velocidad
+            local targetFOV = 70 + (speed / 8)
+            camera.FieldOfView = lerp(camera.FieldOfView, targetFOV, 0.1)
+        else
+            -- 3. MODO ANCLA ABSOLUTA (No cae, no se mueve)
+            b_vel.Velocity = Vector3.new(0, 0, 0)
+            camera.FieldOfView = lerp(camera.FieldOfView, 70, 0.1)
+        end
+        
+        -- Limpieza de fuerzas externas para evitar el "Spin"
+        seat.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        seat.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        
+    else
+        CleanMovers()
+        if camera.FieldOfView ~= 70 then
+            camera.FieldOfView = lerp(camera.FieldOfView, 70, 0.1)
+        end
+    end
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local CombatTab = Window:Tab({ 
+    Title = "Combat", 
+    Icon = "solar:crown-star-bold" 
+})
+
+local RenderTab = Window:Tab({ 
+    Title = "Esp", 
+    Icon = "solar:eye-bold" 
+})
+
+local HitTab = Window:Tab({ 
+    Title = "Hitbox", 
+    Icon = "solar:gamepad-bold" 
+})
+
+local FarmTab = Window:Tab({ 
+    Title = "Others", 
+    Icon = "solar:global-linear" 
+})
+
+Window:Divider()
+
+local HotkeysTab = Window:Tab({ 
+    Title = "Pc keys", 
+    Icon = "solar:keyboard-bold" 
+})
+
+local HUDTab = Window:Tab({ 
+    Title = "Movil Bottons", 
+    Icon = "solar:widget-add-bold-duotone" -- Un icono de agregar widgets
+})
+
+Window:Divider() -- Una línea para separar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // Función para el Sonido 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- boton
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Botones -- Combat --
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // VARIABLES DE CONTROL // --
+_G.Z_Vehicle_Active = false
+_G.Z_Vehicle_Speed = 50 -- Velocidad base del slider
+_G.Z_Vehicle_FOV = 70   -- FOV base
+
+FarmTab:Section({ Title = "Vehicle Hack (CSC Pro)" })
+
+-- 1. Switch de Activación
+FarmTab:Toggle({
+    Title = "Activar Vehicle Speed",
+    Desc = "Aumenta la velocidad del carro al estar sentado.",
+    Value = _G.Z_Vehicle_Active,
+    Callback = function(state)
+        _G.Z_Vehicle_Active = state
+        -- Reset del FOV al apagar
+        if not state then workspace.CurrentCamera.FieldOfView = 70 end
+    end
+})
+
+-- 2. Slider de Velocidad (1 a 350)
+FarmTab:Slider({
+    Title = "Velocidad de Vuelo/Manejo",
+    Desc = "Ajusta que tan rápido quieres que vuele el carro.",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 350,
+        Default = 50,
+    },
+    Callback = function(val)
+        _G.Z_Vehicle_Speed = val
+    end
+})
