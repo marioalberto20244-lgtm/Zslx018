@@ -244,89 +244,125 @@ end
 
 
 
--- // 🧹 LIMPIEZA Y PREPARACIÓN // --
+
+
+
+
+
+
+
+-- // 🧹 LIMPIEZA DE ARMAS Y CONEXIONES // --
+if _G.Z_GunCleanup then _G.Z_GunCleanup() end
+
 local Player = game.Players.LocalPlayer
 local gunCache = {}
 local gunLoopActive = true
+local connections = {}
 
--- // 🔍 ESCÁNER QUIRÚRGICO (SOLO 1 VEZ POR ARMA) // --
+_G.Z_GunCleanup = function()
+    gunLoopActive = false
+    gunCache = {}
+    for _, c in pairs(connections) do c:Disconnect() end
+end
+
+-- // 🔧 APLICADOR DE HACKS (FIX MIRA Y BRAZOS FLOTANTES) // --
+local function HackGun(v)
+    if type(v) ~= "table" or not rawget(v, "gunName") then return end
+    
+    -- ♾️ Visual INF y Balas Instantáneas
+    if _G.Z_GunMods_InfAmmo then
+        v.Ammo = 99999
+        v.AmmoInGun = 99999
+        v.StoredAmmo = math.huge -- Pone "INF" en el menú del juego
+        v.MaxStoredAmmo = math.huge
+        v.Jammed = false
+    end
+    
+    -- 🔥 Modo Ráfaga (Burst)
+    if _G.Z_GunMods_Burst then
+        v.ShootType = 2
+        v.BurstShot = 3
+        if type(v.FireModes) == "table" then
+            v.FireModes.Burst = true
+            v.FireModes.Semi = true
+            v.FireModes.Auto = false
+            v.FireModes.ChangeFiremode = true
+        end
+    end
+    
+    -- 🎯 No Recoil Literalmente Láser (Sin romper la cámara)
+    if _G.Z_GunMods_NoRecoil then
+        v.MinRecoilPower = 0
+        v.MaxRecoilPower = 0
+        v.MinSpread = 0
+        v.MaxSpread = 0
+        v.AimRecoilReduction = 0
+        v.AimInaccuracyDecrease = 0
+        v.WalkMult = 0
+        v.AimSpreadReduction = 0
+        -- NOTA: Ya no tocamos camRecoil para que tus brazos no floten al apuntar
+    end
+end
+
+-- // 🔍 ESCÁNER 100% CERO LAG // --
 _G.Z_ForceGunScan = function()
     if not _G.Z_GunMods_Active then return end
     pcall(function()
-        gunCache = {} -- Vaciamos basura vieja para no laguear
+        gunCache = {} -- Limpiamos basura
         for _, v in pairs(getgc(true)) do
             if type(v) == "table" and rawget(v, "gunName") then
                 table.insert(gunCache, v)
-                
-                -- APLICAMOS LOS HACKS AL INSTANTE
-                -- ♾️ Visual INF y Balas
-                if _G.Z_GunMods_InfAmmo then
-                    v.Ammo = 99999
-                    v.AmmoInGun = 99999
-                    v.StoredAmmo = math.huge -- Esto hace que el HUD diga "INF"
-                    v.MaxStoredAmmo = math.huge
-                    v.Jammed = false
-                end
-                
-                -- 🔥 Modo Ráfaga
-                if _G.Z_GunMods_Burst then
-                    v.ShootType = 2
-                    v.BurstShot = 3
-                    if v.FireModes then
-                        v.FireModes.Burst = true
-                        v.FireModes.Semi = true
-                        v.FireModes.Auto = false
-                        v.FireModes.ChangeFiremode = true
-                    end
-                end
-                
-                -- 🎯 No Recoil Literalmente a 0
-                if _G.Z_GunMods_NoRecoil then
-                    v.camRecoil = {camRecoilUp={0,0},camRecoilTilt={0,0},camRecoilLeft={0,0},camRecoilRight={0,0}}
-                    v.gunRecoil = {gunRecoilUp={0,0},gunRecoilTilt={0,0},gunRecoilLeft={0,0},gunRecoilRight={0,0},DownPunch=0}
-                    v.MinSpread = 0
-                    v.MaxSpread = 0
-                    v.AimRecoilReduction = 0
-                    v.AimInaccuracyDecrease = 0
-                end
+                HackGun(v) -- Aplicar al momento de encontrarla
             end
         end
     end)
 end
 
--- // ⚡ DETECTOR DE EQUIPAMIENTO (EL SECRETO DEL CERO LAG) // --
-local function SetupCharacter(char)
-    -- Cuando sacas el arma de tu bolsa, el script la escanea
-    char.ChildAdded:Connect(function(obj)
+-- // ⚡ DETECTAR ARMAS EN EL INVENTARIO (ANTES DE SACARLAS) // --
+local function HookBackpack(backpack)
+    table.insert(connections, backpack.ChildAdded:Connect(function(obj)
         if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            task.wait(0.5) -- Le damos medio segundo al juego para cargar el arma
+            -- El arma acaba de entrar a tu inventario. Esperamos 0.3s y la hackeamos.
+            task.wait(0.3)
             _G.Z_ForceGunScan()
         end
-    end)
+    end))
 end
 
-if Player.Character then SetupCharacter(Player.Character) end
-Player.CharacterAdded:Connect(SetupCharacter)
+-- Conectar al inventario actual
+if Player:FindFirstChild("Backpack") then HookBackpack(Player.Backpack) end
 
--- // 🔄 RECARGA FANTASMA (1 VEZ POR SEGUNDO) // --
--- Esto solo mantiene las balas en 99999 si disparas mucho, no gasta CPU.
+-- Conectar cada vez que mueras y revivas
+table.insert(connections, Player.CharacterAdded:Connect(function(char)
+    local bp = Player:WaitForChild("Backpack", 5)
+    if bp then HookBackpack(bp) end
+    
+    -- Por si el juego te da el arma directo a las manos
+    table.insert(connections, char.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            task.wait(0.3)
+            _G.Z_ForceGunScan()
+        end
+    end))
+end))
+
+-- Ejecutar la primera vez que prendes el botón
+if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
+
+-- // 🔄 MANTENEDOR DE BALAS (1 SEGUNDO, 0% CPU) // --
 task.spawn(function()
     while gunLoopActive do
-        task.wait(1) -- Pausa GIGANTE de 1 segundo (0 lag)
-        if _G.Z_GunMods_Active and #gunCache > 0 then
+        task.wait(1) -- Pausa enorme para evitar lag
+        if _G.Z_GunMods_Active and _G.Z_GunMods_InfAmmo and #gunCache > 0 then
             for _, v in pairs(gunCache) do
                 pcall(function()
-                    if _G.Z_GunMods_InfAmmo then
-                        v.Ammo = 99999
-                        v.AmmoInGun = 99999
-                        v.Jammed = false
-                    end
+                    v.AmmoInGun = 99999
+                    v.Jammed = false
                 end)
             end
         end
     end
 end)
-
 
 
 
