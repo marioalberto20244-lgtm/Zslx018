@@ -244,40 +244,54 @@ end
 
 
 
--- // 🧹 LIMPIEZA DE ARMAS // --
+-- // 🧹 LIMPIEZA DE ARMAS LITE // --
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
 
-local gunCache = {} -- Aquí guardamos las armas para no escanear toda la memoria
-local lastScan = 0
+local gunCache = {}
 local gunLoopActive = true
+local Player = game.Players.LocalPlayer
 
 _G.Z_GunCleanup = function()
     gunLoopActive = false
     gunCache = {}
 end
 
--- // 🔫 MOTOR ACS LITE (CERO LAG) // --
+-- // 🔍 ESCANEO INTELIGENTE (CERO LAG) // --
+-- Solo usamos getgc() cuando es ESTRICTAMENTE necesario
+local function ScanWeapons()
+    pcall(function()
+        gunCache = {} -- Limpiamos caché viejo para no saturar memoria
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "gunName") then
+                table.insert(gunCache, v)
+            end
+        end
+    end)
+end
+
+-- Escanear si te equipas un arma nueva (Así nos ahorramos el loop pesado)
+local function SetupCharacter(char)
+    char.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") then
+            task.wait(0.5) -- Esperamos a que el arma cargue sus datos
+            ScanWeapons()
+        end
+    end)
+end
+
+if Player.Character then SetupCharacter(Player.Character) end
+Player.CharacterAdded:Connect(SetupCharacter)
+
+-- Escanear por primera vez al activar
+if _G.Z_GunMods_Active then ScanWeapons() end
+
+-- // 🔫 MOTOR ACS LITE (APLICACIÓN DE HACKS) // --
 task.spawn(function()
     while gunLoopActive do
-        task.wait(0.5) -- Pausa de medio segundo (Ahorra 95% de CPU)
+        task.wait(0.5) -- Pausa larga de medio segundo, ni se siente
         
-        if _G.Z_GunMods_Active then
-            
-            -- 1. ESCANEO INTELIGENTE (Solo busca armas nuevas cada 5 segundos)
-            if tick() - lastScan > 5 then
-                lastScan = tick()
-                pcall(function()
-                    for _, v in pairs(getgc(true)) do
-                        if type(v) == "table" and rawget(v, "gunName") then
-                            if not table.find(gunCache, v) then
-                                table.insert(gunCache, v)
-                            end
-                        end
-                    end
-                end)
-            end
-
-            -- 2. APLICAR HACKS A LAS ARMAS GUARDADAS (Súper rápido)
+        if _G.Z_GunMods_Active and #gunCache > 0 then
+            -- Mantenemos los valores al máximo solo en las armas guardadas
             for _, v in pairs(gunCache) do
                 pcall(function()
                     -- 🔥 MODO RÁFAGA
@@ -292,7 +306,7 @@ task.spawn(function()
                         v.BurstShot = 3
                     end
                     
-                    -- ♾️ MUNICIÓN INFINITA Y ANTI-ATASCO
+                    -- ♾️ MUNICIÓN INF
                     if _G.Z_GunMods_InfAmmo then
                         v.Ammo = 99999
                         v.StoredAmmo = 99999
@@ -320,7 +334,6 @@ task.spawn(function()
         end
     end
 end)
-
 
 
 
