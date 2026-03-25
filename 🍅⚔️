@@ -1,0 +1,844 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris") 
+local Stats = game:GetService("Stats")
+local Workspace = game:GetService("Workspace")
+
+--// 2. VARIABLES DE ENTORNO //--
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local ParentTarget = LocalPlayer:WaitForChild("PlayerGui")
+
+local cloneref = (cloneref or clonereference or function(instance) return instance end)
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // FUNCIÓN MAESTRA: GENERADOR DE ACCESOS RÁPIDOS Z-NORESTE // --
+local function CreateQuickButton(Name, VariableName, IconID)
+    -- Verificar si ya existe
+    if game.CoreGui:FindFirstChild("Z_Widget_"..Name) then return end
+
+    local Z_WidgetGui = Instance.new("ScreenGui", game.CoreGui)
+    Z_WidgetGui.Name = "Z_Widget_"..Name
+    
+    local Holder = Instance.new("Frame", Z_WidgetGui)
+    Holder.Size = UDim2.new(0, 115, 0, 35)
+    Holder.Position = UDim2.new(0.5, -57, 0.2, 0) 
+    Holder.BackgroundTransparency = 1 
+
+    local MainBtn = Instance.new("TextButton", Holder)
+    MainBtn.Size = UDim2.new(1, 0, 1, 0)
+    MainBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    MainBtn.BackgroundTransparency = 0.25 
+    MainBtn.Text = "" 
+    MainBtn.ClipsDescendants = true
+    Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 8)
+
+    -- [LAYOUT E ICONOS IGUAL QUE ANTES]
+    local Layout = Instance.new("UIListLayout", MainBtn)
+    Layout.FillDirection = "Horizontal"
+    Layout.HorizontalAlignment = "Center"
+    Layout.VerticalAlignment = "Center"
+    Layout.Padding = UDim.new(0, 6)
+
+    local Icon = Instance.new("ImageLabel", MainBtn)
+    Icon.BackgroundTransparency = 1
+    Icon.Size = UDim2.new(0, 18, 0, 18)
+    Icon.Image = "rbxassetid://"..tostring(IconID)
+
+    local TextLabel = Instance.new("TextLabel", MainBtn)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.AutomaticSize = "XY"
+    TextLabel.Text = Name:upper()
+    TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 10
+
+    local RainbowStroke = Instance.new("UIStroke", MainBtn)
+    RainbowStroke.Thickness = 2.2
+    local UIGradient = Instance.new("UIGradient", RainbowStroke)
+    UIGradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))})
+
+    task.spawn(function()
+        local angle = 0
+        game:GetService("RunService").RenderStepped:Connect(function()
+            angle = angle + 3 
+            UIGradient.Rotation = angle
+            local isActive = _G[VariableName]
+            TextLabel.TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+            Icon.ImageColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+        end)
+    end)
+
+    -- // EVENTO DE CLICK (SÓLO PARA ACTIVAR) // --
+    MainBtn.MouseButton1Click:Connect(function()
+        _G[VariableName] = not _G[VariableName]
+        _G.Z_Force_Reset = true 
+        
+        local s = Instance.new("Sound", game.SoundService)
+        s.SoundId = "rbxassetid://120401943587131"
+        s:Play()
+    end)
+
+    -- // LÓGICA DRAGGABLE MEJORADA (PC & MÓVIL) // --
+    local dragging = false
+    local isPressing = false
+    local dragStart, startPos, holdStartTime
+    local holdThreshold = 0.35 -- Tiempo para que empiece a arrastrar
+
+    MainBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isPressing = true
+            holdStartTime = tick()
+            dragStart = input.Position
+            startPos = Holder.Position
+        end
+    end)
+
+    -- Usamos UserInputService global para detectar el movimiento aunque el mouse se salga del botón
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if isPressing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            -- Solo activamos el drag si se ha mantenido presionado el tiempo suficiente
+            if (tick() - holdStartTime) >= holdThreshold then
+                dragging = true
+                local delta = input.Position - dragStart
+                Holder.Position = UDim2.new(
+                    startPos.X.Scale, 
+                    startPos.X.Offset + delta.X, 
+                    startPos.Y.Scale, 
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+    end)
+
+    -- EL FIX REAL: Resetear todo cuando sueltas el click
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isPressing = false
+            dragging = false
+            holdStartTime = 0
+        end
+    end)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+    
+    if ok then
+        WindUI = result
+    else 
+        if cloneref(game:GetService("RunService")):IsStudio() then
+            WindUI = require(cloneref(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init")))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Beto321df/oiioidjasfdhsf/refs/heads/main/32%24"))()
+        end
+    end
+end
+
+-- */  Window  /* --
+local Window = WindUI:CreateWindow({
+    Title = "ZBeta v1.0  |  El Paso Texas.",
+    Author = "By  •  @znoreste",
+    Folder = "Z_EPT_Configs", -- CAMBIADO: Sin caracteres raros para que no de error
+    Icon = "solar:incognito-broken", -- El icono se queda igual, este no da error
+    Theme = "Red",
+    NewElements = true,
+    HideSearchBar = true,
+    
+    OpenButton = {
+        Title = "Z - EPT",
+        CornerRadius = UDim.new(1,0),
+        StrokeThickness = 3,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.8,
+        
+        Color = ColorSequence.new(
+            Color3.fromHex("#e53935"), 
+            Color3.fromHex("#e53935")
+        )
+    },
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Default",
+    },
+})
+
+do
+    Window:Tag({
+        Title = "AntiBan: ON",
+        Icon = "solar:shield-bold-duotone",
+        Color = Color3.fromHex("#1c1c1c"),
+        Border = true,
+    })
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // 🧹 LIMPIEZA DE MEMORIA // --
+if _G.Z_GunCleanup then _G.Z_GunCleanup() end
+
+local Player = game.Players.LocalPlayer
+local gunLoopActive = true
+local connections = {}
+local Originals = {} -- Guardamos los valores por si desactivas el hack
+
+_G.Z_GunCleanup = function()
+    gunLoopActive = false
+    Originals = {}
+    for _, c in pairs(connections) do c:Disconnect() end
+end
+
+-- // 🔧 APLICADOR DE HACKS (LA COMBINACIÓN PERFECTA) // --
+local function HackGun(v)
+    if type(v) ~= "table" or not rawget(v, "gunName") then return end
+    
+    -- --- 🔥 MODO RÁFAGA (SCRIPT 1) ---
+    if _G.Z_GunMods_Burst then
+        v.ShootType = 2
+        v.BurstShot = 3
+        if type(v.FireModes) == "table" then
+            v.FireModes.Burst = true
+            v.FireModes.Semi = true
+            v.FireModes.Auto = false
+            v.FireModes.ChangeFiremode = true
+        end
+    end
+
+    -- --- ♾️ INF AMMO TAL CUAL (SCRIPT 2) ---
+    if _G.Z_GunMods_InfAmmo then
+        v.AmmoInGun = math.huge 
+        v.Ammo = math.huge
+        v.StoredAmmo = math.huge
+        v.MaxStoredAmmo = math.huge 
+        if rawget(v, "Jammed") ~= nil then v.Jammed = false end
+    end
+
+    -- --- 🎯 NO RECOIL ULTRA PRO (SCRIPT 2) ---
+    if _G.Z_GunMods_NoRecoil then
+        v.MinSpread = 0
+        v.MaxSpread = 0
+        v.AimInaccuracyStepAmount = 0
+        v.AimInaccuracyDecrease = 10 -- Recuperación instantánea
+        
+        v.MinRecoilPower = 0
+        v.MaxRecoilPower = 0
+        v.RecoilPowerStepAmount = 0
+        v.Recoil = 0 
+
+        -- Reseteo de Cámara
+        if type(v.camRecoil) == "table" then
+            v.camRecoil.camRecoilUp = {0,0}
+            v.camRecoil.camRecoilTilt = {0,0}
+            v.camRecoil.camRecoilLeft = {0,0}
+            v.camRecoil.camRecoilRight = {0,0}
+        end
+        -- Reseteo del Arma
+        if type(v.gunRecoil) == "table" then
+            v.gunRecoil.gunRecoilUp = {0,0}
+            v.gunRecoil.gunRecoilTilt = {0,0}
+            v.gunRecoil.gunRecoilLeft = {0,0}
+            v.gunRecoil.gunRecoilRight = {0,0}
+            v.gunRecoil.DownPunch = 0
+        end
+    end
+end
+
+-- // 🔍 ESCÁNER QUIRÚRGICO (SE EJECUTA 1 SOLA VEZ, CERO LAG) // --
+_G.Z_ForceGunScan = function()
+    if not _G.Z_GunMods_Active then return end
+    pcall(function()
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "gunName") then
+                HackGun(v)
+            end
+        end
+    end)
+end
+
+-- // ⚡ SISTEMA INSTANTÁNEO DESDE EL INVENTARIO (ANTI-LAG) // --
+local function HookBackpack(backpack)
+    table.insert(connections, backpack.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            -- El arma entra a tu inventario. Esperamos 0.3s y le metemos todo.
+            task.wait(0.3)
+            _G.Z_ForceGunScan()
+        end
+    end))
+end
+
+if Player:FindFirstChild("Backpack") then HookBackpack(Player.Backpack) end
+
+table.insert(connections, Player.CharacterAdded:Connect(function(char)
+    local bp = Player:WaitForChild("Backpack", 5)
+    if bp then HookBackpack(bp) end
+    
+    table.insert(connections, char.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            task.wait(0.3)
+            _G.Z_ForceGunScan()
+        end
+    end))
+end))
+
+-- Ejecución inicial
+if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
+
+-- // 🔄 EL TRUCO FÍSICO (1 SEGUNDO DE PAUSA = 0% CPU) // --
+task.spawn(function()
+    while gunLoopActive do
+        task.wait(1) -- Solo se ejecuta 1 vez por segundo, tu cel ni lo siente
+        
+        if _G.Z_GunMods_Active and _G.Z_GunMods_InfAmmo then
+            pcall(function()
+                local char = Player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                -- Actualiza los valores internos (Hi-Point fix) de lo que tienes en la mano
+                if tool then
+                    for _, obj in pairs(tool:GetDescendants()) do
+                        if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+                            local n = obj.Name:lower()
+                            if n:find("ammo") or n:find("gun") or n:find("mag") then
+                                obj.Value = 999999 
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local CombatTab = Window:Tab({ 
+    Title = "Combat", 
+    Icon = "solar:crown-star-bold" 
+})
+
+local RenderTab = Window:Tab({ 
+    Title = "Esp", 
+    Icon = "solar:eye-bold" 
+})
+
+local HitTab = Window:Tab({ 
+    Title = "Hitbox", 
+    Icon = "solar:gamepad-bold" 
+})
+
+local FarmTab = Window:Tab({ 
+    Title = "Others", 
+    Icon = "solar:global-linear" 
+})
+
+Window:Divider()
+
+local HotkeysTab = Window:Tab({ 
+    Title = "Pc keys", 
+    Icon = "solar:keyboard-bold" 
+})
+
+local HUDTab = Window:Tab({ 
+    Title = "Movil Bottons", 
+    Icon = "solar:widget-add-bold-duotone" -- Un icono de agregar widgets
+})
+
+Window:Divider() -- Una línea para separar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // Función para el Sonido 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- boton
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Botones -- Combat --
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // ⚙️ VARIABLES INICIALES (AUTO CSC) // --
+_G.Z_Aimbot_Active = false
+_G.Z_Aimbot_Smoothing = 2  
+_G.Z_Aimbot_FOV = 120
+_G.Z_Aimbot_Part = "Head"
+_G.Z_MaxStuds = 500
+_G.Z_Aimbot_WallCheck = true
+_G.Z_Aimbot_TeamCheck = true -- Ahora es automático inteligente
+_G.Z_Aimbot_ShowFOV = true
+_G.Z_FOV_Shape = "Circulo"
+
+CombatTab:Section({ Title = "Aimbot Auto-Inteligente CSC" })
+
+CombatTab:Toggle({
+    Title = "Activar Aimbot",
+    Desc = "Apunta solo a tus enemigos reales.",
+    Value = _G.Z_Aimbot_Active,
+    Callback = function(state) _G.Z_Aimbot_Active = state end
+})
+
+CombatTab:Slider({
+    Title = "Fuerza de Anclaje (Smoothing)",
+    Desc = "1: Rage | 25: Legit.",
+    Step = 1,
+    Value = { Min = 1, Max = 25, Default = 2 },
+    Callback = function(val) _G.Z_Aimbot_Smoothing = val end
+})
+
+CombatTab:Slider({
+    Title = "Rango de FOV",
+    Desc = "Área de detección.",
+    Step = 1,
+    Value = { Min = 10, Max = 800, Default = 120 },
+    Callback = function(val) _G.Z_Aimbot_FOV = val end
+})
+
+CombatTab:Input({
+    Title = "Límite de Distancia (Studs)",
+    Desc = "Máximo de studs para detectar.",
+    Placeholder = "500",
+    Callback = function(val)
+        local n = tonumber(val)
+        if n then _G.Z_MaxStuds = n end
+    end
+})
+
+CombatTab:Dropdown({
+    Title = "Filtros Activos (Auto-Team)",
+    Desc = "El Team Check detecta tu equipo automáticamente.",
+    Multi = true,
+    Values = { "Team Check", "Wall Check", "Show FOV" },
+    Value = { "Team Check", "Wall Check", "Show FOV" },
+    Callback = function(options)
+        _G.Z_Aimbot_TeamCheck = table.find(options, "Team Check") and true or false
+        _G.Z_Aimbot_WallCheck = table.find(options, "Wall Check") and true or false
+        _G.Z_Aimbot_ShowFOV = table.find(options, "Show FOV") and true or false
+    end
+})
+
+CombatTab:Dropdown({
+    Title = "Forma del FOV",
+    Values = { "Circulo", "Cuadrado", "Estrella" },
+    Value = "Circulo",
+    Callback = function(option) _G.Z_FOV_Shape = option end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // ⚙️ VARIABLES INICIALES (ACS + HI-POINT MODS) // --
+_G.Z_GunMods_Active = false
+_G.Z_GunMods_Burst = true
+_G.Z_GunMods_InfAmmo = true
+_G.Z_GunMods_NoRecoil = true
+
+CombatTab:Section({ Title = "Armas ACS / Hi-Point (Zero Lag)" })
+
+CombatTab:Toggle({
+    Title = "Activar Gun Mods",
+    Desc = "Aplica los hacks al instante desde el inventario.",
+    Value = _G.Z_GunMods_Active,
+    Callback = function(state) 
+        _G.Z_GunMods_Active = state 
+        if state and _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
+    end
+})
+
+CombatTab:Dropdown({
+    Title = "Hacks de Arma",
+    Multi = true,
+    Values = { "Burst (Ráfaga)", "Inf Ammo (Ultra)", "No Recoil (Láser)" },
+    Value = { "Burst (Ráfaga)", "Inf Ammo (Ultra)", "No Recoil (Láser)" },
+    Callback = function(options)
+        _G.Z_GunMods_Burst = table.find(options, "Burst (Ráfaga)") and true or false
+        _G.Z_GunMods_InfAmmo = table.find(options, "Inf Ammo (Ultra)") and true or false
+        _G.Z_GunMods_NoRecoil = table.find(options, "No Recoil (Láser)") and true or false
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // 🧹 LIMPIEZA DE MEMORIA // --
+if _G.Z_AimCleanup then _G.Z_AimCleanup() end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local connections = {}
+
+-- // 🎨 POOL DE LÍNEAS (SIN LAG) // --
+local FOVLines = {}
+for i = 1, 16 do
+    local l = Drawing.new("Line")
+    l.Thickness = 1.5
+    l.Transparency = 0.8
+    l.Color = Color3.fromHex("#30FF6A")
+    l.Visible = false
+    table.insert(FOVLines, l)
+end
+
+_G.Z_AimCleanup = function()
+    for _, c in pairs(connections) do c:Disconnect() end
+    for _, l in pairs(FOVLines) do l:Remove() end
+end
+
+-- // 🛡️ WALL CHECK FIXED // --
+local function IsVisible(part, char)
+    if not _G.Z_Aimbot_WallCheck then return true end
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character, char}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local res = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position), params)
+    return res == nil
+end
+
+-- // 🎯 BUSCADOR CSC AUTO-INTELIGENTE // --
+local targetPart = nil
+local lastSearch = 0
+
+local function GetTarget()
+    -- Optimización: Solo calcula todo 10 veces por segundo
+    if tick() - lastSearch < 0.1 then return targetPart end
+    lastSearch = tick()
+
+    local maxFOV = _G.Z_Aimbot_FOV or 120
+    local center = Camera.ViewportSize / 2
+    local newTarget = nil
+
+    -- 🔍 AUTO DETECCIÓN DE TU EQUIPO ACTUAL
+    local myTeam = LocalPlayer.Team and LocalPlayer.Team.Name or ""
+    local iAmLaw = (myTeam == "Border Patrol" or myTeam == "US Army" or myTeam == "FBI" or myTeam == "BORTAC" or myTeam == "State Trooper" or myTeam == "HSI")
+    local iAmCivil = (myTeam == "Civilian" or myTeam == "Civil")
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local char = p.Character
+            local part = char:FindFirstChild(_G.Z_Aimbot_Part or "Head")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            
+            if part and hum and hum.Health > 0 then
+                -- 📏 FILTRO STUDS
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then continue end
+                local dist3D = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if dist3D > (_G.Z_MaxStuds or 500) then continue end
+
+                -- 🤖 AUTO TEAM CHECK (LA MAGIA)
+                if _G.Z_Aimbot_TeamCheck then
+                    local otherTeam = p.Team and p.Team.Name or ""
+                    local targetIsLaw = (otherTeam == "Border Patrol" or otherTeam == "US Army" or otherTeam == "FBI" or otherTeam == "BORTAC" or otherTeam == "State Trooper" or otherTeam == "HSI")
+                    local targetIsCivil = (otherTeam == "Civilian" or otherTeam == "Civil")
+
+                    -- Lógica de combate (Si soy Ley, solo civiles. Si soy civil, solo Ley).
+                    if iAmLaw and not targetIsCivil then continue end
+                    if iAmCivil and not targetIsLaw then continue end
+                    -- Si no soy ni Ley ni Civil (ej. neutral), ignoro a todos por seguridad
+                    if not iAmLaw and not iAmCivil then continue end
+                end
+
+                -- 👁️ FOV Y WALL CHECK
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local distFOV = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if distFOV < maxFOV then
+                        if IsVisible(part, char) then
+                            maxFOV = distFOV
+                            newTarget = part
+                        end
+                    end
+                end
+            end
+        end
+    end
+    targetPart = newTarget
+    return targetPart
+end
+
+-- // 🔄 LOOP MAESTRO // --
+local mainLoop = RunService.RenderStepped:Connect(function()
+    local center = Camera.ViewportSize / 2
+    local fovDist = _G.Z_Aimbot_FOV or 120
+    local active = _G.Z_Aimbot_Active
+    local showFOV = _G.Z_Aimbot_ShowFOV and active
+    
+    for i = 1, 16 do FOVLines[i].Visible = false end
+
+    -- 🎨 DIBUJAR FOV LITE
+    if showFOV then
+        local shape = _G.Z_FOV_Shape or "Circulo"
+        if shape == "Circulo" then
+            for i = 1, 16 do
+                local a1, a2 = math.rad((i-1)*22.5), math.rad(i*22.5)
+                FOVLines[i].From = center + Vector2.new(math.cos(a1)*fovDist, math.sin(a1)*fovDist)
+                FOVLines[i].To = center + Vector2.new(math.cos(a2)*fovDist, math.sin(a2)*fovDist)
+                FOVLines[i].Visible = true
+            end
+        elseif shape == "Cuadrado" then
+            local p = {
+                center + Vector2.new(-fovDist, -fovDist), center + Vector2.new(fovDist, -fovDist),
+                center + Vector2.new(fovDist, fovDist), center + Vector2.new(-fovDist, fovDist)
+            }
+            for i = 1, 4 do
+                FOVLines[i].From = p[i]; FOVLines[i].To = p[i%4+1]; FOVLines[i].Visible = true
+            end
+        elseif shape == "Estrella" then
+            local pts = {}
+            for i = 1, 10 do
+                local r = (i%2==0) and fovDist or (fovDist*0.45)
+                local a = math.rad((i*36)-90)
+                table.insert(pts, center + Vector2.new(math.cos(a)*r, math.sin(a)*r))
+            end
+            for i = 1, 10 do
+                FOVLines[i].From = pts[i]; FOVLines[i].To = pts[i%10+1]; FOVLines[i].Visible = true
+            end
+        end
+    end
+
+    -- 🎯 AIMBOT LITE
+    if active then
+        local target = GetTarget()
+        if target then
+            local smooth = _G.Z_Aimbot_Smoothing or 5
+            local lookAt = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(lookAt, 1 / smooth)
+        end
+    end
+end)
+
+table.insert(connections, mainLoop)
