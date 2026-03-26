@@ -1,10 +1,12 @@
 -- ==============================================================================
--- Z-HUB: MINI HUB v44.0 (MOBILE OPTIMIZED / 2-NODE BUY)
+-- Z-HUB: MINI HUB v44.1 (AUTO-RECOVERY / CAR FIX)
 -- ==============================================================================
 local p = game.Players.LocalPlayer
 local rs = game:GetService("RunService")
 
 local char, hum, hrp
+local miAsiento = nil -- Variable persistente fuera del loop
+
 local function refreshVars()
     char = p.Character or p.CharacterAdded:Wait()
     hum = char:WaitForChild("Humanoid")
@@ -12,13 +14,12 @@ local function refreshVars()
 end
 refreshVars()
 
--- 1. UI
+-- 1. UI (Igual que el tuy6)
 local sg = Instance.new("ScreenGui", p.PlayerGui); sg.Name = "Z_Mini_Hub"; sg.ResetOnSpawn = false
 local m = Instance.new("Frame", sg); m.Size, m.Position, m.BackgroundColor3, m.Active, m.Draggable = UDim2.new(0,180,0,60), UDim2.new(0.05,0,0.3,0), Color3.fromRGB(15,15,15), true, true
 local b = Instance.new("TextButton", m); b.Size, b.Position, b.Text, b.TextColor3, b.Font = UDim2.new(1,-10,1,-10), UDim2.new(0,5,0,5), "AUTO-FARM: OFF", Color3.new(1,1,1), Enum.Font.Code; b.BackgroundColor3 = Color3.fromRGB(80,0,0)
 
--- 2. LISTA (LÍMITE 2)
-local items = {["Fake Designer Bag"]=2, ["Fake Watch"]=2, ["Sarsaparilla"]=2, ["Taco"]=2, ["Bloxy Cola"]=2}
+local items = {["Fake Designer Bag"]=3, ["Fake Watch"]=5, ["Sarsaparilla"]=1}
 
 local function getQty(name)
     local c, s = 0, name:lower()
@@ -27,7 +28,6 @@ local function getQty(name)
     return c
 end
 
--- 3. MOTOR NOCLIP & ROTACIÓN
 local noclipLoop = nil
 local function toggleNoclip(state)
     if state then
@@ -46,16 +46,17 @@ local function focus(targetPos)
     hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(targetPos.X, hrp.Position.Y, targetPos.Z))
 end
 
--- 4. MOTOR TP VEHICLE (MOBILE SNAPPY)
+-- MOTOR TP VEHICLE (FIXED)
 local function safeVehicleTP(dest, autoDismount, seat)
-    local veh = seat and seat:FindFirstAncestorOfClass("Model")
+    if not seat or not seat.Parent then return end -- Si no hay asiento, NO HACE TP (Evita confusiones)
+    local veh = seat:FindFirstAncestorOfClass("Model")
     if veh then
         for _, part in pairs(veh:GetDescendants()) do 
             if part:IsA("BasePart") then part.Anchored = true; part.AssemblyLinearVelocity = Vector3.zero end 
         end
         local _, sz = veh:GetBoundingBox()
         veh:PivotTo(CFrame.new(dest.X, dest.Y + (sz.Y/2) + 0.3, dest.Z) * CFrame.Angles(0, math.rad(3), 0))
-        task.wait(0.3) -- Más rápido para móvil
+        task.wait(0.3) 
         for _, part in pairs(veh:GetDescendants()) do if part:IsA("BasePart") then part.Anchored = false end end
     end
     if autoDismount then
@@ -64,11 +65,9 @@ local function safeVehicleTP(dest, autoDismount, seat)
         hrp.CFrame = CFrame.new(dest.X + 8, dest.Y + 2, dest.Z)
         task.wait(0.1)
         hrp.Anchored = false
-        hum:ChangeState(Enum.HumanoidStateType.Freefall)
     end
 end
 
--- 5. MOTOR COMPRA Y GRAP
 local function AutoBuy(segundos)
     local endTime = tick() + segundos
     while tick() < endTime do
@@ -115,15 +114,12 @@ local function AutoInteract(keywords, waitAfter)
     end
 end
 
--- 6. LOOP MAESTRO
+-- LOOP MAESTRO FIX
 local autoFarm = false
-local skipF1 = false
-
 b.Activated:Connect(function()
     autoFarm = not autoFarm
     b.Text = autoFarm and "AUTO-FARM: ON" or "AUTO-FARM: OFF"
     b.BackgroundColor3 = autoFarm and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(80, 0, 0)
-    if not autoFarm then skipF1 = false end 
 end)
 
 task.spawn(function()
@@ -133,32 +129,36 @@ task.spawn(function()
             pcall(function()
                 refreshVars()
                 
-                -- F1: CAMINATA (UNA SOLA VEZ)
-                if not skipF1 and not (hum.Sit and hum.SeatPart) then
-                    local d1 = Vector3.new(-1947, 3, 55)
-                    while (hrp.Position - d1).Magnitude > 3 and autoFarm do hum:MoveTo(d1); task.wait(0.1) end
-                    while autoFarm and not (hum.Sit and hum.SeatPart) do task.wait(1) end
+                -- SI NO TENEMOS CARRO, BUSCARLO (O ir al inicio)
+                if not miAsiento or not miAsiento.Parent then
+                    if hum.SeatPart then 
+                        miAsiento = hum.SeatPart -- Guardar el nuevo carro
+                    else
+                        -- Teletransportar al punto de inicio para buscar carro
+                        hrp.CFrame = CFrame.new(-1947, 3, 55)
+                        task.wait(1)
+                        return -- Reiniciar loop para detectar carro
+                    end
                 end
                 
-                if not autoFarm then return end
-                if hum.Sit and hum.SeatPart then skipF1 = true end
-                
-                local miAsiento = hum.SeatPart 
+                -- ASEGURAR ESTAR SENTADO ANTES DE CUALQUER FASE
+                if not hum.Sit then
+                    hrp.CFrame = miAsiento.CFrame
+                    task.wait(0.2)
+                    miAsiento:Sit(hum)
+                    task.wait(0.3)
+                end
 
-                -- FASE 2: TP MERCADO
+                -- FASE 2: MERCADO
                 safeVehicleTP(Vector3.new(-1821, 2, 15), true, miAsiento)
-
-                -- FASE 3: COMPRAS (2 NODOS - ULTRA FAST)
                 toggleNoclip(true)
-                -- Nodo 1 (Principal)
                 hrp.CFrame = CFrame.new(-1843, 3, 8); task.wait(0.2); AutoBuy(3) 
-                -- Nodo 2 (Final - Antes Nodo 5)
                 hrp.CFrame = CFrame.new(-1831, 3, 11); task.wait(0.2); AutoBuy(0.2) 
-
-                -- REGRESO CARRO
-                hrp.CFrame = CFrame.new(-1818, 3, 15); task.wait(0.1); toggleNoclip(false)
+                
+                -- REGRESO AL CARRO (FIX: TP AL ASIENTO)
+                hrp.CFrame = miAsiento.CFrame; task.wait(0.1); toggleNoclip(false)
                 local int1 = 0
-                while hum.SeatPart ~= miAsiento and int1 < 9 and autoFarm do miAsiento:Sit(hum); task.wait(0.2); int1 += 1 end
+                while hum.SeatPart ~= miAsiento and int1 < 10 do miAsiento:Sit(hum); task.wait(0.3); int1 += 1 end
 
                 -- FASE 6: ENTREGA
                 safeVehicleTP(Vector3.new(3486, 2, -761), true, miAsiento) 
@@ -166,10 +166,10 @@ task.spawn(function()
                 hrp.CFrame = CFrame.new(3500, 2, -752); task.wait(0.2)
                 AutoInteract({"sell", "smuggle"}, 1) 
 
-                -- REGRESO CARRO
-                hrp.CFrame = CFrame.new(3489, 2, -761); task.wait(0.1); toggleNoclip(false)
+                -- REGRESO AL CARRO
+                hrp.CFrame = miAsiento.CFrame; task.wait(0.1); toggleNoclip(false)
                 local int2 = 0
-                while hum.SeatPart ~= miAsiento and int2 < 9 and autoFarm do miAsiento:Sit(hum); task.wait(0.2); int2 += 1 end
+                while hum.SeatPart ~= miAsiento and int2 < 10 do miAsiento:Sit(hum); task.wait(0.3); int2 += 1 end
 
                 -- FASE 10: LAVADO
                 safeVehicleTP(Vector3.new(-1872, 2, -6), true, miAsiento)
@@ -177,10 +177,11 @@ task.spawn(function()
                 hrp.CFrame = CFrame.new(-1847, 3, -9); task.wait(0.2)
                 AutoInteract({"laundry", "dirty"}, 1) 
 
-                -- FINAL CICLO
-                hrp.CFrame = CFrame.new(-1869, 2, -6); task.wait(0.2); toggleNoclip(false)
+                -- FINAL: REGRESO AL CARRO
+                hrp.CFrame = miAsiento.CFrame; task.wait(0.1); toggleNoclip(false)
                 local int3 = 0
-                while hum.SeatPart ~= miAsiento and int3 < 9 and autoFarm do miAsiento:Sit(hum); task.wait(0.2); int3 += 1 end
+                while hum.SeatPart ~= miAsiento and int3 < 10 do miAsiento:Sit(hum); task.wait(0.3); int3 += 1 end
+                
                 task.wait(0.5)
             end)
         end
