@@ -248,6 +248,15 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
 -- // 🧹 LIMPIEZA DE MEMORIA // --
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
 
@@ -266,15 +275,29 @@ end
 local function HackGun(v)
     if type(v) ~= "table" or not rawget(v, "gunName") then return end
     
-    -- --- 🔥 MODO RÁFAGA (SCRIPT 1) ---
+    local gName = tostring(v.gunName):lower()
+    
+    -- --- 🔥 MODOS DE FUEGO PERSONALIZADOS POR ARMA ---
     if _G.Z_GunMods_Burst then
-        v.ShootType = 2
-        v.BurstShot = 3
-        if type(v.FireModes) == "table" then
-            v.FireModes.Burst = true
-            v.FireModes.Semi = true
-            v.FireModes.Auto = false
-            v.FireModes.ChangeFiremode = true
+        if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
+            -- RÁFAGA (BURST) para Hi-point y Glock normal
+            v.ShootType = 2
+            v.BurstShot = 3
+            if type(v.FireModes) == "table" then
+                v.FireModes.Burst = true
+                v.FireModes.Semi = true
+                v.FireModes.Auto = false
+                v.FireModes.ChangeFiremode = true
+            end
+        elseif gName:find("tec%-9") or gName:find("glock switch") or gName:find("ar%-15") or gName:find("ak%-47") then
+            -- AUTO (FULL AUTO) para TEC-9, Glock Switch, AR-15 y AK-47
+            v.ShootType = 3
+            if type(v.FireModes) == "table" then
+                v.FireModes.Burst = false
+                v.FireModes.Semi = true
+                v.FireModes.Auto = true
+                v.FireModes.ChangeFiremode = true
+            end
         end
     end
 
