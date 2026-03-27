@@ -257,125 +257,157 @@ end
 
 
 
--- // 🧠 CEREBRO: GUN MODS v44.9.0 "THE ULTIMATE BYPASS"
--- Optimizado por Zslx: Balas INF Instantáneas (Bypass Total)
--- // -------------------------------------------------------------------------- // --
 
+
+
+
+-- // 🧹 LIMPIEZA DE MEMORIA // --
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
 
 local Player = game.Players.LocalPlayer
-local connections = {}
 local gunLoopActive = true
+local connections = {}
+local Originals = {} -- Guardamos los valores por si desactivas el hack
 
 _G.Z_GunCleanup = function()
     gunLoopActive = false
+    Originals = {}
     for _, c in pairs(connections) do c:Disconnect() end
 end
 
--- // 💉 EL INYECTOR DE MEMORIA VIVA (BYPASS) // --
-local function ForceInstantHack(v)
+-- // 🔧 APLICADOR DE HACKS (LA COMBINACIÓN PERFECTA) // --
+local function HackGun(v)
     if type(v) ~= "table" or not rawget(v, "gunName") then return end
     
     local gName = tostring(v.gunName):lower()
-
-    -- 1. 🔥 FIREMODES (RAFAGA/AUTO)
+    
+    -- --- 🔥 MODOS DE FUEGO PERSONALIZADOS POR ARMA ---
     if _G.Z_GunMods_Burst then
         if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
+            -- RÁFAGA (BURST) para Hi-point y Glock normal
             v.ShootType = 2
             v.BurstShot = 3
             if type(v.FireModes) == "table" then
-                v.FireModes.Burst, v.FireModes.Auto = true, false
+                v.FireModes.Burst = true
+                v.FireModes.Semi = true
+                v.FireModes.Auto = false
+                v.FireModes.ChangeFiremode = true
             end
         elseif gName:find("tec%-9") or gName:find("glock switch") or gName:find("ar%-15") or gName:find("ak%-47") then
+            -- AUTO (FULL AUTO) para TEC-9, Glock Switch, AR-15 y AK-47
             v.ShootType = 3
             if type(v.FireModes) == "table" then
-                v.FireModes.Burst, v.FireModes.Auto = false, true
+                v.FireModes.Burst = false
+                v.FireModes.Semi = true
+                v.FireModes.Auto = true
+                v.FireModes.ChangeFiremode = true
             end
         end
     end
 
-    -- 2. ♾️ BYPASS DE BALAS (EL QUE NO FALLA)
+    -- --- ♾️ INF AMMO TAL CUAL (SCRIPT 2) ---
     if _G.Z_GunMods_InfAmmo then
-        -- Cambiamos los valores en la tabla "viva" de la memoria
-        v.Ammo = 999
-        v.AmmoInGun = 999
-        v.StoredAmmo = 999
-        v.MaxStoredAmmo = 999
-        v.IncludeChamberedBullet = true
-        if v.Jammed ~= nil then v.Jammed = false end
+        v.AmmoInGun = math.huge 
+        v.Ammo = math.huge
+        v.StoredAmmo = math.huge
+        v.MaxStoredAmmo = math.huge 
+        if rawget(v, "Jammed") ~= nil then v.Jammed = false end
     end
 
-    -- 3. 🎯 NO RECOIL / NO SPREAD
+    -- --- 🎯 NO RECOIL ULTRA PRO (SCRIPT 2) ---
     if _G.Z_GunMods_NoRecoil then
-        v.MinSpread, v.MaxSpread, v.Recoil = 0, 0, 0
-        v.AimInaccuracyDecrease = 100
+        v.MinSpread = 0
+        v.MaxSpread = 0
         v.AimInaccuracyStepAmount = 0
-        if v.camRecoil then for i, _ in pairs(v.camRecoil) do v.camRecoil[i] = {0,0} end end
-        if v.gunRecoil then for i, _ in pairs(v.gunRecoil) do v.gunRecoil[i] = {0,0} end end
+        v.AimInaccuracyDecrease = 10 -- Recuperación instantánea
+        
+        v.MinRecoilPower = 0
+        v.MaxRecoilPower = 0
+        v.RecoilPowerStepAmount = 0
+        v.Recoil = 0 
+
+        -- Reseteo de Cámara
+        if type(v.camRecoil) == "table" then
+            v.camRecoil.camRecoilUp = {0,0}
+            v.camRecoil.camRecoilTilt = {0,0}
+            v.camRecoil.camRecoilLeft = {0,0}
+            v.camRecoil.camRecoilRight = {0,0}
+        end
+        -- Reseteo del Arma
+        if type(v.gunRecoil) == "table" then
+            v.gunRecoil.gunRecoilUp = {0,0}
+            v.gunRecoil.gunRecoilTilt = {0,0}
+            v.gunRecoil.gunRecoilLeft = {0,0}
+            v.gunRecoil.gunRecoilRight = {0,0}
+            v.gunRecoil.DownPunch = 0
+        end
     end
 end
 
--- // ⚡ BUCLE DE ALTA PRIORIDAD // --
+-- // 🔍 ESCÁNER QUIRÚRGICO (SE EJECUTA 1 SOLA VEZ, CERO LAG) // --
+_G.Z_ForceGunScan = function()
+    if not _G.Z_GunMods_Active then return end
+    pcall(function()
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "gunName") then
+                HackGun(v)
+            end
+        end
+    end)
+end
+
+-- // ⚡ SISTEMA INSTANTÁNEO DESDE EL INVENTARIO (ANTI-LAG) // --
+local function HookBackpack(backpack)
+    table.insert(connections, backpack.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            -- El arma entra a tu inventario. Esperamos 0.3s y le metemos todo.
+            task.wait(0.3)
+            _G.Z_ForceGunScan()
+        end
+    end))
+end
+
+if Player:FindFirstChild("Backpack") then HookBackpack(Player.Backpack) end
+
+table.insert(connections, Player.CharacterAdded:Connect(function(char)
+    local bp = Player:WaitForChild("Backpack", 5)
+    if bp then HookBackpack(bp) end
+    
+    table.insert(connections, char.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            task.wait(0.3)
+            _G.Z_ForceGunScan()
+        end
+    end))
+end))
+
+-- Ejecución inicial
+if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
+
+-- // 🔄 EL TRUCO FÍSICO (1 SEGUNDO DE PAUSA = 0% CPU) // --
 task.spawn(function()
     while gunLoopActive do
-        -- Corremos esto lo más rápido posible sin crashear (Bucle infinito de bypass)
-        if _G.Z_GunMods_Active then
-            -- ATAQUE 1: A la memoria de ejecución (getgc)
-            local success, gc = pcall(getgc, true)
-            if success then
-                for _, v in pairs(gc) do
-                    if type(v) == "table" and rawget(v, "gunName") then
-                        ForceInstantHack(v)
-                    end
-                end
-            end
-
-            -- ATAQUE 2: A los objetos físicos (HUD FIX)
+        task.wait(1) -- Solo se ejecuta 1 vez por segundo, tu cel ni lo siente
+        
+        if _G.Z_GunMods_Active and _G.Z_GunMods_InfAmmo then
             pcall(function()
-                local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
-                if tool and _G.Z_GunMods_InfAmmo then
+                local char = Player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                -- Actualiza los valores internos (Hi-Point fix) de lo que tienes en la mano
+                if tool then
                     for _, obj in pairs(tool:GetDescendants()) do
                         if obj:IsA("IntValue") or obj:IsA("NumberValue") then
                             local n = obj.Name:lower()
-                            if n:find("ammo") or n:find("mag") or n:find("cur") or n:find("stored") then
-                                -- Forzamos el valor físico del cargador
-                                obj.Value = 999 
+                            if n:find("ammo") or n:find("gun") or n:find("mag") then
+                                obj.Value = 999999 
                             end
                         end
                     end
                 end
             end)
         end
-        task.wait(0.1) -- Escaneo cada 0.1s para que sea instantáneo al picar el botón
     end
 end)
-
--- // ⚡ AUTO-SCAN AL EQUIPAR // --
-table.insert(connections, Player.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(function(obj)
-        if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            -- Le metemos 10 escaneos rápidos en cuanto toca la mano
-            task.spawn(function()
-                for i = 1, 10 do
-                    _G.Z_ForceGunScan()
-                    task.wait(0.05)
-                end
-            end)
-        end
-    end)
-end))
-
-_G.Z_ForceGunScan = function()
-    pcall(function()
-        for _, v in pairs(getgc(true)) do
-            if type(v) == "table" and rawget(v, "gunName") then ForceInstantHack(v) end
-        end
-    end)
-end
-
-if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
-
-
 
 
 
