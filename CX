@@ -414,10 +414,9 @@ end)
 
 
 
-
 -- ==============================================================================
--- 🧠 CEREBRO: AUTO-FARM v44.8.3 "TRUE FIX EDITION" (SMART INV + TRUE DEATH)
--- Optimizado por Zslx: Adiós Anclaje. Fix del mono que se queda tirado.
+-- 🧠 CEREBRO: AUTO-FARM v44.8.4 "TRUE FIX EDITION" (SMART INV + TRUE DEATH)
+-- Optimizado por Zslx: Adiós Anclaje. Fix definitivo del Fling en primer TP.
 -- ==============================================================================
 local p = game.Players.LocalPlayer
 local rs = game:GetService("RunService")
@@ -497,7 +496,7 @@ local function safeVehicleTP(dest)
     if not miAsiento or not miAsiento.Parent then return end 
     local veh = miAsiento:FindFirstAncestorOfClass("Model")
     if veh then
-        -- 1. Matar momentum (CERO FLING) sin anclar (Anclar rompe el asiento we!)
+        -- 1. Matar momentum ANTES del TP
         for _, part in pairs(veh:GetDescendants()) do 
             if part:IsA("BasePart") then 
                 part.AssemblyLinearVelocity = Vector3.zero 
@@ -505,8 +504,18 @@ local function safeVehicleTP(dest)
             end 
         end
         local _, sz = veh:GetBoundingBox()
+        
         -- 2. Teletransportar
         veh:PivotTo(CFrame.new(dest.X, dest.Y + (sz.Y/2) + 0.3, dest.Z) * CFrame.Angles(0, math.rad(3), 0))
+        
+        -- 3. FIX FLING PRIMER TP: Volver a matar momentum DESPUÉS del TP al instante
+        for _, part in pairs(veh:GetDescendants()) do 
+            if part:IsA("BasePart") then 
+                part.AssemblyLinearVelocity = Vector3.zero 
+                part.AssemblyAngularVelocity = Vector3.zero 
+            end 
+        end
+        
         task.wait(0.1) 
     end
 end
