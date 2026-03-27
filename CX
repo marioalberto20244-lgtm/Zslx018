@@ -256,154 +256,129 @@ end
 
 
 
-
 -- // 🧹 LIMPIEZA DE MEMORIA // --
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
 
 local Player = game.Players.LocalPlayer
+local rs = game:GetService("RunService")
+local vim = game:GetService("VirtualInputManager") 
+
+local char, hum, hrp
 local gunLoopActive = true
 local connections = {}
-local Originals = {} -- Guardamos los valores por si desactivas el hack
+
+local function refreshVars()
+    char = Player.Character or Player.CharacterAdded:Wait()
+    hum = char:WaitForChild("Humanoid")
+    hrp = char:WaitForChild("HumanoidRootPart")
+end
+refreshVars()
 
 _G.Z_GunCleanup = function()
     gunLoopActive = false
-    Originals = {}
     for _, c in pairs(connections) do c:Disconnect() end
 end
 
--- // 🔧 APLICADOR DE HACKS (LA COMBINACIÓN PERFECTA) // --
-local function HackGun(v)
+-- // 🔧 EL APLICADOR QUIRÚRGICO (INSTANTÁNEO) // --
+local function InstantHack(v)
     if type(v) ~= "table" or not rawget(v, "gunName") then return end
     
     local gName = tostring(v.gunName):lower()
     
-    -- --- 🔥 MODOS DE FUEGO PERSONALIZADOS POR ARMA ---
+    -- --- 🔥 MODOS DE FUEGO (BURST/AUTO) ---
     if _G.Z_GunMods_Burst then
         if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
-            -- RÁFAGA (BURST) para Hi-point y Glock normal
             v.ShootType = 2
             v.BurstShot = 3
             if type(v.FireModes) == "table" then
-                v.FireModes.Burst = true
-                v.FireModes.Semi = true
-                v.FireModes.Auto = false
-                v.FireModes.ChangeFiremode = true
+                v.FireModes.Burst, v.FireModes.Semi, v.FireModes.Auto = true, true, false, true
             end
         elseif gName:find("tec%-9") or gName:find("glock switch") or gName:find("ar%-15") or gName:find("ak%-47") then
-            -- AUTO (FULL AUTO) para TEC-9, Glock Switch, AR-15 y AK-47
             v.ShootType = 3
             if type(v.FireModes) == "table" then
-                v.FireModes.Burst = false
-                v.FireModes.Semi = true
-                v.FireModes.Auto = true
-                v.FireModes.ChangeFiremode = true
+                v.FireModes.Burst, v.FireModes.Semi, v.FireModes.Auto = false, true, true, true
             end
         end
     end
 
-    -- --- ♾️ INF AMMO TAL CUAL (SCRIPT 2) ---
+    -- --- ♾️ BALAS INFANTÁNEAS (EL FIX) ---
     if _G.Z_GunMods_InfAmmo then
-        v.AmmoInGun = math.huge 
-        v.Ammo = math.huge
-        v.StoredAmmo = math.huge
-        v.MaxStoredAmmo = math.huge 
+        v.AmmoInGun = 999
+        v.Ammo = 999
+        v.StoredAmmo = 999999
+        v.MaxStoredAmmo = 999999
         if rawget(v, "Jammed") ~= nil then v.Jammed = false end
+        
+        -- Inyectar directamente en el cargador activo si el arma está equipada
+        pcall(function()
+            local tool = Player.Character:FindFirstChildOfClass("Tool")
+            if tool then
+                for _, obj in pairs(tool:GetDescendants()) do
+                    if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+                        local n = obj.Name:lower()
+                        if n:find("ammo") or n:find("mag") or n:find("cur") then
+                            obj.Value = 999
+                        end
+                    end
+                end
+            end
+        end)
     end
 
-    -- --- 🎯 NO RECOIL ULTRA PRO (SCRIPT 2) ---
+    -- --- 🎯 NO RECOIL ---
     if _G.Z_GunMods_NoRecoil then
-        v.MinSpread = 0
-        v.MaxSpread = 0
-        v.AimInaccuracyStepAmount = 0
-        v.AimInaccuracyDecrease = 10 -- Recuperación instantánea
-        
-        v.MinRecoilPower = 0
-        v.MaxRecoilPower = 0
-        v.RecoilPowerStepAmount = 0
-        v.Recoil = 0 
-
-        -- Reseteo de Cámara
+        v.MinSpread, v.MaxSpread, v.Recoil, v.MinRecoilPower, v.MaxRecoilPower = 0, 0, 0, 0, 0
         if type(v.camRecoil) == "table" then
-            v.camRecoil.camRecoilUp = {0,0}
-            v.camRecoil.camRecoilTilt = {0,0}
-            v.camRecoil.camRecoilLeft = {0,0}
-            v.camRecoil.camRecoilRight = {0,0}
+            for i, _ in pairs(v.camRecoil) do v.camRecoil[i] = {0,0} end
         end
-        -- Reseteo del Arma
         if type(v.gunRecoil) == "table" then
-            v.gunRecoil.gunRecoilUp = {0,0}
-            v.gunRecoil.gunRecoilTilt = {0,0}
-            v.gunRecoil.gunRecoilLeft = {0,0}
-            v.gunRecoil.gunRecoilRight = {0,0}
-            v.gunRecoil.DownPunch = 0
+            for i, _ in pairs(v.gunRecoil) do v.gunRecoil[i] = {0,0} end
         end
     end
 end
 
--- // 🔍 ESCÁNER QUIRÚRGICO (SE EJECUTA 1 SOLA VEZ, CERO LAG) // --
+-- // 🔍 ESCÁNER DE MEMORIA TOTAL // --
 _G.Z_ForceGunScan = function()
     if not _G.Z_GunMods_Active then return end
     pcall(function()
         for _, v in pairs(getgc(true)) do
             if type(v) == "table" and rawget(v, "gunName") then
-                HackGun(v)
+                InstantHack(v)
             end
         end
     end)
 end
 
--- // ⚡ SISTEMA INSTANTÁNEO DESDE EL INVENTARIO (ANTI-LAG) // --
-local function HookBackpack(backpack)
-    table.insert(connections, backpack.ChildAdded:Connect(function(obj)
+-- // ⚡ DETECTOR DE EQUIPAMIENTO // --
+local function HookCharacter(character)
+    table.insert(connections, character.ChildAdded:Connect(function(obj)
         if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            -- El arma entra a tu inventario. Esperamos 0.3s y le metemos todo.
-            task.wait(0.3)
+            -- En cuanto tocas el arma, el script la "viola" antes de que cargue
+            _G.Z_ForceGunScan()
+            task.wait(0.1) -- Doble chequeo por si el arma es lenta
             _G.Z_ForceGunScan()
         end
     end))
 end
 
-if Player:FindFirstChild("Backpack") then HookBackpack(Player.Backpack) end
+if Player.Character then HookCharacter(Player.Character) end
+table.insert(connections, Player.CharacterAdded:Connect(HookCharacter))
 
-table.insert(connections, Player.CharacterAdded:Connect(function(char)
-    local bp = Player:WaitForChild("Backpack", 5)
-    if bp then HookBackpack(bp) end
-    
-    table.insert(connections, char.ChildAdded:Connect(function(obj)
-        if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            task.wait(0.3)
-            _G.Z_ForceGunScan()
-        end
-    end))
-end))
-
--- Ejecución inicial
-if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
-
--- // 🔄 EL TRUCO FÍSICO (1 SEGUNDO DE PAUSA = 0% CPU) // --
+-- // 🔄 BUCLE DE MANTENIMIENTO (SÚPER RÁPIDO) // --
 task.spawn(function()
     while gunLoopActive do
-        task.wait(1) -- Solo se ejecuta 1 vez por segundo, tu cel ni lo siente
-        
-        if _G.Z_GunMods_Active and _G.Z_GunMods_InfAmmo then
-            pcall(function()
-                local char = Player.Character
-                local tool = char and char:FindFirstChildOfClass("Tool")
-                -- Actualiza los valores internos (Hi-Point fix) de lo que tienes en la mano
-                if tool then
-                    for _, obj in pairs(tool:GetDescendants()) do
-                        if obj:IsA("IntValue") or obj:IsA("NumberValue") then
-                            local n = obj.Name:lower()
-                            if n:find("ammo") or n:find("gun") or n:find("mag") then
-                                obj.Value = 999999 
-                            end
-                        end
-                    end
-                end
-            end)
+        -- Si está prendido, escaneamos cada 0.3s (Ni se siente el lag we)
+        if _G.Z_GunMods_Active then
+            _G.Z_ForceGunScan()
+            task.wait(0.3) 
+        else
+            task.wait(1)
         end
     end
 end)
+
+-- Ejecución inicial inmediata
+if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
 
 
 
