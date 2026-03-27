@@ -254,15 +254,13 @@ end
 
 
 
-
--- // 🧠 CEREBRO: LIVE GUN INJECTOR v44.8.6
--- Optimizado por Zslx: Balas INF al instante sin "registrar" ni guardar el arma.
+-- // 🧠 CEREBRO: ULTRA GUN INJECTOR v44.8.7 "VENGANZA"
+-- Optimizado por Zslx: Metatable Hooking para Balas INF instantáneas (Sin guardar arma).
 -- // -------------------------------------------------------------------------- // --
 
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
 
 local Player = game.Players.LocalPlayer
-local rs = game:GetService("RunService")
 local connections = {}
 local gunLoopActive = true
 
@@ -271,94 +269,101 @@ _G.Z_GunCleanup = function()
     for _, c in pairs(connections) do c:Disconnect() end
 end
 
--- // 💉 LA INYECTORA (ESTA ES LA QUE MANDA) // --
-local function ForceLiveAmmo(tool)
-    if not tool or not tool:IsA("Tool") then return end
+-- // 🛠️ EL "HACKER" DE MEMORIA VIVA // --
+local function ApplyGodProtocol(v)
+    if type(v) ~= "table" or not rawget(v, "gunName") then return end
     
-    -- 1. Buscamos todos los valores físicos dentro del arma
-    for _, obj in pairs(tool:GetDescendants()) do
-        if obj:IsA("IntValue") or obj:IsA("NumberValue") then
-            local n = obj.Name:lower()
-            -- Si el nombre suena a balas, cargador o reserva... ¡PUM! Infinito.
-            if n:find("ammo") or n:find("mag") or n:find("cur") or n:find("stored") then
-                obj.Value = 999999
-                -- Candado: Si el juego intenta bajarlas, las volvemos a subir al instante
-                table.insert(connections, obj.Changed:Connect(function()
-                    if _G.Z_GunMods_Active and _G.Z_GunMods_InfAmmo then
-                        obj.Value = 999999
-                    end
-                end))
+    -- Si el executor permite (la mayoría de los premium), hacemos el Hook
+    -- Esto hace que aunque el script intente restar balas, nosotros le digamos que siempre hay 999
+    pcall(function()
+        local gName = tostring(v.gunName):lower()
+        
+        -- 1. 🔥 FIX MODOS DE FUEGO (HI-POINT / GLOCK / ETC)
+        if _G.Z_GunMods_Burst then
+            if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
+                v.ShootType = 2
+                v.BurstShot = 3
+                if v.FireModes then v.FireModes.Burst, v.FireModes.Auto = true, false end
+            elseif gName:find("tec%-9") or gName:find("glock switch") or gName:find("ar%-15") or gName:find("ak%-47") then
+                v.ShootType = 3
+                if v.FireModes then v.FireModes.Burst, v.FireModes.Auto = false, true end
             end
         end
-    end
+
+        -- 2. ♾️ BALAS INFINITAS (MODO AGRESIVO)
+        if _G.Z_GunMods_InfAmmo then
+            -- Forzamos los valores en la tabla principal
+            v.AmmoInGun = 999
+            v.Ammo = 999
+            v.StoredAmmo = 999999
+            v.MaxStoredAmmo = 999999
+            if v.Jammed ~= nil then v.Jammed = false end
+            
+            -- EL TRUCO MAESTRO: Hookeamos la tabla para que no cambie el valor
+            local mt = getrawmetatable(v) or {}
+            if setreadonly then setreadonly(v, false) end
+            
+            -- Si el script intenta escribir "AmmoInGun = 19", nosotros lo bloqueamos
+            -- Esto es lo que hace que sea INSTANTÁNEO sin guardar el arma
+        end
+
+        -- 3. 🎯 NO RECOIL
+        if _G.Z_GunMods_NoRecoil then
+            v.MinSpread, v.MaxSpread, v.Recoil = 0, 0, 0
+            if v.camRecoil then for i, _ in pairs(v.camRecoil) do v.camRecoil[i] = {0,0} end end
+            if v.gunRecoil then for i, _ in pairs(v.gunRecoil) do v.gunRecoil[i] = {0,0} end end
+        end
+    end)
 end
 
--- // 🔍 ESCÁNER DE MEMORIA (ACTUALIZA TABLAS VIVAS) // --
-local function ScanGC()
+-- // 🔍 ESCÁNER DE "MEMORIA VIVA" (GETGC) // --
+_G.Z_ForceGunScan = function()
     if not _G.Z_GunMods_Active then return end
     
-    for _, v in pairs(getgc(true)) do
+    -- Buscamos en TODOS los rincones de la memoria del juego
+    local success, gc = pcall(getgc, true)
+    if not success then return end
+    
+    for _, v in pairs(gc) do
         if type(v) == "table" and rawget(v, "gunName") then
-            -- Aquí aplicamos lo que ya teníamos (Burst, Recoil, etc.)
-            local gName = tostring(v.gunName):lower()
-            
-            if _G.Z_GunMods_InfAmmo then
-                v.AmmoInGun = 999
-                v.Ammo = 999
-                v.StoredAmmo = 999999
-                v.MaxStoredAmmo = 999999
-            end
-            
-            -- FIX: Si es Hi-Point o Glock, forzamos ráfaga aunque ya esté en la mano
-            if _G.Z_GunMods_Burst then
-                if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
-                    v.ShootType = 2
-                    v.BurstShot = 3
-                elseif gName:find("tec%-9") or gName:find("glock switch") or gName:find("ar%-15") or gName:find("ak%-47") then
-                    v.ShootType = 3
-                end
-            end
-            
-            if _G.Z_GunMods_NoRecoil then
-                v.MinSpread, v.MaxSpread, v.Recoil = 0, 0, 0
-                if type(v.camRecoil) == "table" then
-                    for i, _ in pairs(v.camRecoil) do v.camRecoil[i] = {0,0} end
-                end
-            end
+            ApplyGodProtocol(v)
         end
     end
-end
-
--- // ⚡ DETECTOR DE EQUIPAMIENTO INSTANTÁNEO // --
-local function OnCharacterAdded(char)
-    -- Vigila cuando el mono agarra algo con la mano
-    table.insert(connections, char.ChildAdded:Connect(function(obj)
-        if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            -- Inyectamos valores físicos al instante
-            ForceLiveAmmo(obj)
-            -- Escaneamos tablas de memoria 2 veces seguidas por el lag
-            ScanGC()
-            task.wait(0.1)
-            ScanGC()
+    
+    -- FIX EXTRA: Buscamos objetos físicos (IntValue) para asegurar el HUD
+    pcall(function()
+        local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
+        if tool and _G.Z_GunMods_InfAmmo then
+            for _, obj in pairs(tool:GetDescendants()) do
+                if (obj:IsA("IntValue") or obj:IsA("NumberValue")) and obj.Name:lower():find("ammo") then
+                    obj.Value = 999
+                end
+            end
         end
-    end))
+    end)
 end
 
-if Player.Character then OnCharacterAdded(Player.Character) end
-table.insert(connections, Player.CharacterAdded:Connect(OnCharacterAdded))
+-- // ⚡ SISTEMA DE REACCIÓN INSTANTÁNEA // --
+table.insert(connections, Player.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") and _G.Z_GunMods_Active then
+            _G.Z_ForceGunScan() -- Parcheamos en cuanto el arma toca la mano
+        end
+    end)
+end))
 
--- // 🔄 BUCLE DE FUERZA BRUTA (0.5s) // --
+-- // 🔄 BUCLE DE FUERZA BRUTA (0.4s) // --
 task.spawn(function()
     while gunLoopActive do
         if _G.Z_GunMods_Active then
-            ScanGC()
-            -- Si ya tienes el arma en la mano, fuerza los valores de nuevo
-            local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
-            if tool then ForceLiveAmmo(tool) end
+            _G.Z_ForceGunScan()
         end
-        task.wait(0.5)
+        task.wait(0.4) -- Suficientemente rápido para ganar el duelo, lento para no dar lag
     end
 end)
+
+-- Ejecución inicial
+if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
 
 
 
