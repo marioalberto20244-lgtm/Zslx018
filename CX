@@ -253,8 +253,11 @@ end
 
 
 
--- // 🧠 CEREBRO: ULTRA GUN INJECTOR v44.8.8 "ZERO FRACASOS"
--- Optimizado por Zslx: Fix definitivo para Balas INF instantáneas.
+
+
+
+-- // 🧠 CEREBRO: GUN MODS v44.8.9 "EL MARTILLO"
+-- Optimizado por Zslx: Balas INF instantáneas y modo ráfaga/auto garantizado.
 -- // -------------------------------------------------------------------------- // --
 
 if _G.Z_GunCleanup then _G.Z_GunCleanup() end
@@ -268,12 +271,24 @@ _G.Z_GunCleanup = function()
     for _, c in pairs(connections) do c:Disconnect() end
 end
 
--- // 🎯 FUNCIÓN QUIRÚRGICA PARA CADA ARMA // --
-local function ApplyHacks(v)
+-- // 🎯 LA INYECTORA DE FUERZA BRUTA // --
+local function DeepHack(v)
+    -- Si no es una tabla o no tiene nombre de arma, la saltamos
     if type(v) ~= "table" or not rawget(v, "gunName") then return end
+    
     local gName = tostring(v.gunName):lower()
 
-    -- 1. 🔥 FIREMODES (LO QUE SIEMPRE TE JALA)
+    -- --- ♾️ BALAS INFINITAS (EL FIX DEFINITIVO) ---
+    -- Forzamos todos los nombres posibles de variables de munición
+    if _G.Z_GunMods_InfAmmo then
+        rawset(v, "Ammo", 999)
+        rawset(v, "AmmoInGun", 999)
+        rawset(v, "StoredAmmo", 999)
+        rawset(v, "MaxStoredAmmo", 999)
+        if v.Jammed ~= nil then v.Jammed = false end
+    end
+
+    -- --- 🔥 MODOS DE FUEGO (ESTO YA TE JALABA BIEN) ---
     if _G.Z_GunMods_Burst then
         if gName:find("hi%-point") or (gName:find("glock") and not gName:find("switch")) then
             v.ShootType = 2 -- Burst
@@ -285,16 +300,7 @@ local function ApplyHacks(v)
         end
     end
 
-    -- 2. ♾️ BALAS INF (METODO AGRESIVO)
-    if _G.Z_GunMods_InfAmmo then
-        v.AmmoInGun = 999
-        v.Ammo = 999
-        v.StoredAmmo = 999
-        v.MaxStoredAmmo = 999
-        if v.Jammed ~= nil then v.Jammed = false end
-    end
-
-    -- 3. 🎯 NO RECOIL
+    -- --- 🎯 NO RECOIL ---
     if _G.Z_GunMods_NoRecoil then
         v.MinSpread, v.MaxSpread, v.Recoil = 0, 0, 0
         if v.camRecoil then for i, _ in pairs(v.camRecoil) do v.camRecoil[i] = {0,0} end end
@@ -302,30 +308,34 @@ local function ApplyHacks(v)
     end
 end
 
--- // ⚡ BUCLE DE INYECCIÓN CONSTANTE (PARA QUE NO "REGISTRE" NADA MAL) // --
+-- // ⚡ BUCLE DE ALTA VELOCIDAD (EL QUE HACE LA MAGIA) // --
 task.spawn(function()
     while gunLoopActive do
-        task.wait() -- VELOCIDAD MÁXIMA (Sin lag)
+        -- Ya no esperamos 0.4s, corremos a tope (task.wait() es lo más rápido)
+        task.wait() 
         
         if _G.Z_GunMods_Active then
-            -- ATAQUE 1: A la memoria del juego (getgc)
+            -- 1. ATAQUE A LA MEMORIA (GETGC)
+            -- Buscamos todas las tablas que "parezcan" un arma
             local success, gc = pcall(getgc, true)
             if success then
                 for _, v in pairs(gc) do
                     if type(v) == "table" and rawget(v, "gunName") then
-                        ApplyHacks(v)
+                        DeepHack(v)
                     end
                 end
             end
 
-            -- ATAQUE 2: A los objetos físicos en tu mano (Instantáneo)
+            -- 2. ATAQUE FÍSICO AL ARMA (HUD FIX)
+            -- Si el arma tiene IntValues adentro, los violamos aquí
             pcall(function()
-                local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
+                local char = Player.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
                 if tool and _G.Z_GunMods_InfAmmo then
                     for _, obj in pairs(tool:GetDescendants()) do
                         if obj:IsA("IntValue") or obj:IsA("NumberValue") then
                             local n = obj.Name:lower()
-                            -- Si el objeto se llama Ammo, Mag, Stored... lo congelamos en 999
+                            -- Si dice Ammo, Mag o Stored, lo congelamos en 999
                             if n:find("ammo") or n:find("mag") or n:find("cur") or n:find("stored") then
                                 obj.Value = 999
                             end
@@ -337,28 +347,29 @@ task.spawn(function()
     end
 end)
 
--- // ⚡ REACCIÓN AL EQUIPAR (POR SI EL JUEGO ES RÁPIDO) // --
+-- // ⚡ DETECTOR DE EQUIPAMIENTO RELÁMPAGO // --
 table.insert(connections, Player.CharacterAdded:Connect(function(char)
     char.ChildAdded:Connect(function(obj)
         if obj:IsA("Tool") and _G.Z_GunMods_Active then
-            -- Le metemos el primer golpe en cuanto toca la mano
-            _G.Z_ForceGunScan() 
+            -- En cuanto la tocas, el script le mete el parche antes de que el juego respire
+            for i = 1, 5 do -- 5 intentos seguidos por el lag
+                _G.Z_ForceGunScan()
+                task.wait(0.05)
+            end
         end
     end)
 end))
 
 _G.Z_ForceGunScan = function()
-    -- Solo para ejecución manual si se ocupa
     pcall(function()
         for _, v in pairs(getgc(true)) do
-            if type(v) == "table" and rawget(v, "gunName") then ApplyHacks(v) end
+            if type(v) == "table" and rawget(v, "gunName") then DeepHack(v) end
         end
     end)
 end
 
+-- Ejecución inicial
 if _G.Z_GunMods_Active then _G.Z_ForceGunScan() end
-
-
 
 
 
