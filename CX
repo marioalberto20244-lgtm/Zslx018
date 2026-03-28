@@ -1981,54 +1981,47 @@ CombatTab:Toggle({
 
 
 
-
--- // ⚙️ VARIABLES GLOBALES (COMBATE DIRECTO) // --
+-- // ⚙️ VARIABLES DE CONEXIÓN (TU CEREBRO) // --
+_G.Z_GunMods_Active = true -- El motor siempre está listo para escanear
 _G.Z_GunMods_InfAmmo = false
 _G.Z_GunMods_Burst = false
 _G.Z_GunMods_NoRecoil = false
 
-CombatTab:Section({ Title = "Armas CSC" })
+CombatTab:Section({ Title = "Configuración de Armas (ACS)" })
 
--- 🔵 BOTÓN 1: INF BALAS
-local InfBtn = CombatTab:Button({
-    Title = "Inf Balas",
-    Color = Color3.fromHex("#305dff"),
-    Icon = nil, -- Cambiado de "" a nil para que no ocupe espacio, we
-    Justify = "Center",
-    Callback = function()
-        _G.Z_GunMods_InfAmmo = not _G.Z_GunMods_InfAmmo
-        if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
-    end
-})
-InfBtn:SetDesc("Balas Inf. Tira sin limites.")
-CombatTab:Space()
-
--- 🔵 BOTÓN 2: RAPID FIRE
-local BurstBtn = CombatTab:Button({
-    Title = "Rapid Fire",
-    Color = Color3.fromHex("#305dff"),
+-- 🔵 BOTÓN 1: COMBO (RAPID FIRE + INF BALAS)
+local ComboBtn = CombatTab:Button({
+    Title = "Rapid Fire + Inf Balas",
+    Color = Color3.fromHex("#305dff"), -- Tu azul we
     Icon = nil,
     Justify = "Center",
     Callback = function()
+        -- Conecta a tus variables de Ráfaga e Inf Ammo
+        _G.Z_GunMods_InfAmmo = not _G.Z_GunMods_InfAmmo
         _G.Z_GunMods_Burst = not _G.Z_GunMods_Burst
+        
+        -- PUM! Fuerza el escaneo de tu cerebro
         if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
-BurstBtn:SetDesc("Aumenta un 35% la velocidad de disparo.")
+ComboBtn:SetDesc("Activa ráfaga/auto y balas infinitas al mismo tiempo.")
 CombatTab:Space()
 
--- 🔵 BOTÓN 3: NO RECOIL
+-- 🔵 BOTÓN 2: NO RECOIL
 local RecoilBtn = CombatTab:Button({
     Title = "No Recoil",
     Color = Color3.fromHex("#305dff"),
     Icon = nil,
     Justify = "Center",
     Callback = function()
+        -- Conecta a tu variable de No Recoil
         _G.Z_GunMods_NoRecoil = not _G.Z_GunMods_NoRecoil
+        
+        -- PUM! Fuerza el escaneo de tu cerebro
         if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
-RecoilBtn:SetDesc("Cero retroceso. Tus balas van directo.")
+RecoilBtn:SetDesc("Elimina el retroceso y la dispersión (Láser).")
 CombatTab:Space()
 
 
