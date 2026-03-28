@@ -1637,7 +1637,7 @@ task.spawn(function()
             Camera.CameraSubject = anchor
 
             -- 🎯 EL TRUCO (8 Studs Abajo)
-            HRP.CFrame = surfacePos * CFrame.new(0, -3, 0) 
+            HRP.CFrame = surfacePos * CFrame.new(0, -5, 0) 
             HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
             -- 👻 INVISIBILIDAD
