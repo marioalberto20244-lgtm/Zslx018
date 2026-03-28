@@ -1469,6 +1469,119 @@ end)
 
 
 
+-- // ⚙️ VARIABLES GLOBALES (HITBOX COLOR & TRANS CONFIG) // --
+_G.Z_Hitbox_Enabled = false
+_G.Z_Hitbox_Mode = "Head" 
+_G.Z_Hitbox_Size = 10 
+_G.Z_Hitbox_Color = Color3.fromRGB(255, 0, 0) -- Color inicial: Rojo
+_G.Z_Hitbox_Transparency = 0.5 -- Transparencia inicial (Float)
+_G.Z_Hitbox_TeamCheck = false 
+
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LP = Players.LocalPlayer
+
+    local Original = {
+        Head = Vector3.new(1.2, 1.2, 1.2),
+        HRP = Vector3.new(2, 2, 1)
+    }
+
+    local function GetSideHitbox(player)
+        local team = player.Team and player.Team.Name or ""
+        local law = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civ = {"Civilian", "Civil"}
+        if table.find(law, team) then return "Law" end
+        if table.find(civ, team) then return "Civil" end
+        return "Neutral"
+    end
+
+    local function ResetBody(char)
+        local head = char:FindFirstChild("Head")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if head then 
+            head.Size = Original.Head 
+            head.Transparency = 0 
+            head.Massless = false 
+            head.CanCollide = true
+        end
+        if hrp then 
+            hrp.Size = Original.HRP 
+            hrp.Transparency = 1 
+            hrp.Massless = false 
+        end
+    end
+
+    -- // 🔄 MOTOR DE RENDER // --
+    RunService.RenderStepped:Connect(function()
+        local mySide = GetSideHitbox(LP)
+
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LP and player.Character then
+                local char = player.Character
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                local head = char:FindFirstChild("Head")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+
+                if hum and hum.Health > 0 then
+                    local isEnemy = true
+                    if _G.Z_Hitbox_TeamCheck then
+                        local tSide = GetSideHitbox(player)
+                        if mySide == tSide and mySide ~= "Neutral" then isEnemy = false end
+                    end
+
+                    if _G.Z_Hitbox_Enabled and isEnemy then
+                        local sizeVec = Vector3.new(_G.Z_Hitbox_Size, _G.Z_Hitbox_Size, _G.Z_Hitbox_Size)
+                        local color = _G.Z_Hitbox_Color
+                        local trans = _G.Z_Hitbox_Transparency
+                        
+                        -- Aplicar según el modo seleccionado
+                        if _G.Z_Hitbox_Mode == "Head" then
+                            if head then 
+                                head.Size = sizeVec head.Color = color head.Transparency = trans 
+                                head.Massless = true head.CanCollide = false 
+                            end
+                            if hrp then hrp.Size = Original.HRP hrp.Transparency = 1 end
+                        elseif _G.Z_Hitbox_Mode == "Torso" then
+                            if hrp then 
+                                hrp.Size = sizeVec hrp.Color = color hrp.Transparency = trans 
+                                hrp.Massless = true hrp.CanCollide = false 
+                            end
+                            if head then head.Size = Original.Head head.Transparency = 0 end
+                        elseif _G.Z_Hitbox_Mode == "Huesos" then
+                            if head then head.Size = sizeVec head.Color = color head.Transparency = trans head.Massless = true head.CanCollide = false end
+                            if hrp then hrp.Size = sizeVec hrp.Color = color hrp.Transparency = trans hrp.Massless = true hrp.CanCollide = false end
+                        end
+                    else
+                        ResetBody(char)
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2183,6 +2296,98 @@ local Paragraph = VisualsTab:Paragraph({
         }
     }
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // ⚙️ VARIABLES GLOBALES (HITBOX UNIFIED CONFIG) // --
+_G.Z_Hitbox_Enabled = false
+_G.Z_Hitbox_TeamCheck = false
+_G.Z_Hitbox_Mode = "Head"
+_G.Z_Hitbox_Size = 12
+_G.Z_Hitbox_Color = Color3.fromRGB(255, 0, 0)
+_G.Z_Hitbox_Transparency = 0.5
+
+HitTab:Section({ Title = "Hit box" })
+
+-- 🎯 MASTER TOGGLE
+HitTab:Toggle({
+    Title = "Hitbox v1",
+    Desc = "Hit box en todos los enemigos...",
+    Value = _G.Z_Hitbox_Enabled,
+    Callback = function(state) _G.Z_Hitbox_Enabled = state end
+})
+
+-- 🛡️ TEAM CHECK (FULANITO 6)
+HitTab:Toggle({
+    Title = "Team Check",
+    Desc = "Solo afecta al equipo contrario.",
+    Value = _G.Z_Hitbox_TeamCheck,
+    Callback = function(state) _G.Z_Hitbox_TeamCheck = state end
+})
+
+-- 🔽 SELECCIONAR OBJETIVO (LISTA FIX)
+HitTab:Dropdown({
+    Title = "Objectivo",
+    Desc = "Elige qué parte expandir.",
+    Values = {"Head"},
+    Value = "Head",
+    Callback = function(option) 
+        _G.Z_Hitbox_Mode = option 
+        WindUI:Notify({ Title = "Z-Hitbox", Content = "Objetivo: " .. option, Time = 1.2 })
+    end
+})
+
+-- 📏 SLIDER TAMAÑO
+HitTab:Slider({
+    Title = "Tamaño de Hitbox",
+    Desc = "Radio de expansión.",
+    Step = 1,
+    Value = { Min = 2, Max = 45, Default = 12 },
+    Callback = function(val) _G.Z_Hitbox_Size = val end
+})
+
+-- 🎨 COLORPICKER
+HitTab:Colorpicker({
+    Title = "Color Hitbox",
+    Desc = "Color Del Hitbox..",
+    Default = _G.Z_Hitbox_Color,
+    Callback = function(color) _G.Z_Hitbox_Color = color end
+})
+
+-- 👻 SLIDER TRANSPARENCIA (FLOAT FIX)
+HitTab:Slider({
+    Title = "Transparencia",
+    Desc = "0: Sólido | 1: Invisible.",
+    Step = 0.1, -- Decimales como pediste we
+    Value = { Min = 0, Max = 1, Default = 0.5 },
+    Callback = function(val) _G.Z_Hitbox_Transparency = val end
+})
+
+
+
+
+
 
 
 
