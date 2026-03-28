@@ -1639,7 +1639,7 @@ task.spawn(function()
 
             -- 🎯 EL TRUCO: Enterrado -8 studs y ACOSTADO (-90 grados)
             -- Multiplicamos por CFrame.Angles para rotar el cuerpo
-            HRP.CFrame = (surfacePos * CFrame.new(0, -5.6, 0)) * CFrame.Angles(math.rad(-90), 0, 0)
+            HRP.CFrame = (surfacePos * CFrame.new(3, -7, 2)) * CFrame.Angles(math.rad(-90), 0, 0)
             HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
             -- 👻 INVISIBILIDAD Y SEGURIDAD
