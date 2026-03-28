@@ -1575,6 +1575,120 @@ end)
 
 
 
+-- // ⚙️ VARIABLES DE CONTROL (VOID FIX) // --
+local WasDennis = false
+local DennisCFrame = nil
+local GhostPos = Vector3.new(0, 0, 0)
+local FakeClone = nil
+local CamAnchor = nil
+
+local function GetCamAnchor()
+    if not CamAnchor then
+        CamAnchor = Instance.new("Part", workspace)
+        CamAnchor.Name = "Z_Ghost_Anchor"
+        CamAnchor.Transparency = 1
+        CamAnchor.CanCollide = false
+        CamAnchor.Anchored = true
+    end
+    return CamAnchor
+end
+
+-- // 🔄 MOTOR MODO DENNIS (GHOST ASSASSIN SAFE-EXIT) // --
+task.spawn(function()
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local Camera = workspace.CurrentCamera
+    local LP = Players.LocalPlayer
+
+    RunService.RenderStepped:Connect(function()
+        local Char = LP.Character
+        local HRP = Char and Char:FindFirstChild("HumanoidRootPart")
+        local Hum = Char and Char:FindFirstChild("Humanoid")
+
+        if _G.DennisEnabled and HRP and Hum then
+            if not WasDennis then
+                WasDennis = true
+                DennisCFrame = HRP.CFrame
+                GhostPos = Vector3.new(0, 0, 0)
+                
+                -- CLON SEÑUELO
+                Char.Archivable = true
+                FakeClone = Char:Clone()
+                FakeClone.Name = "Z_Dennis_Decoy"
+                FakeClone.Parent = workspace
+                for _, v in pairs(FakeClone:GetDescendants()) do
+                    if v:IsA("BasePart") then v.Anchored = true v.CanCollide = false end
+                    if v:IsA("LocalScript") or v:IsA("Script") then v:Destroy() end
+                end
+                FakeClone:PivotTo(DennisCFrame)
+            end
+
+            -- 🏃 MOVIMIENTO
+            local moveDir = Hum.MoveDirection
+            GhostPos = GhostPos + (moveDir * (Hum.WalkSpeed * 0.016)) 
+
+            -- 🎥 CÁMARA (Nivel Superficie)
+            local anchor = GetCamAnchor()
+            local surfacePos = DennisCFrame + GhostPos
+            anchor.Position = surfacePos.Position + Vector3.new(0, 2, 0)
+            Camera.CameraSubject = anchor
+
+            -- 🎯 EL TRUCO (8 Studs Abajo)
+            HRP.CFrame = surfacePos * CFrame.new(0, -10, 0) 
+            HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            
+            -- 👻 INVISIBILIDAD
+            for _, part in pairs(Char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false 
+                    part.LocalTransparencyModifier = 1 
+                end
+            end
+        else
+            -- 🔙 REGRESO SEGURO (ANTI-VACÍO)
+            if WasDennis then
+                WasDennis = false
+                if Hum then Camera.CameraSubject = Hum end
+                
+                if HRP and DennisCFrame then
+                    local targetPos = DennisCFrame + GhostPos
+                    
+                    -- 🔍 ESCÁNER DE SUELO (Raycast)
+                    local rayOrigin = targetPos.Position + Vector3.new(0, 10, 0)
+                    local rayDir = Vector3.new(0, -20, 0)
+                    local raycastResult = workspace:Raycast(rayOrigin, rayDir)
+
+                    if raycastResult then
+                        -- Te dejamos 3 studs arriba del suelo que encontramos
+                        HRP.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0))
+                    else
+                        -- Si no hay suelo (estás en la orilla), te dejamos a la altura original
+                        HRP.CFrame = targetPos + Vector3.new(0, 3, 0)
+                    end
+                end
+
+                -- Reset Visual
+                if Char then
+                    for _, p in pairs(Char:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = true p.LocalTransparencyModifier = 0 end
+                    end
+                end
+
+                if FakeClone then FakeClone:Destroy() FakeClone = nil end
+                if CamAnchor then CamAnchor:Destroy() CamAnchor = nil end
+            end
+        end
+    end)
+end)
+
+
+
+
+
+
+
+
+
 
 
 
