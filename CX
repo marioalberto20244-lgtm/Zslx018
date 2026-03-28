@@ -1724,11 +1724,6 @@ local FarmTab = Window:Tab({
 
 Window:Divider()
 
-local HotkeysTab = Window:Tab({ 
-    Title = "Pc keys", 
-    Icon = "solar:keyboard-bold" 
-})
-
 local HUDTab = Window:Tab({ 
     Title = "Movil Bottons", 
     Icon = "solar:widget-add-bold-duotone" -- Un icono de agregar widgets
@@ -1767,58 +1762,6 @@ Window:Divider() -- Una línea para separar
 
 
 -- // Función para el Sonido 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- // 🎵 SISTEMA DE SONIDO PREMIUM (CERO LAG) // --
--- 1. Creamos el sonido UNA SOLA VEZ al cargar el hub
-local Z_Sound = Instance.new("Sound")
-Z_Sound.SoundId = "rbxassetid://138567614125924"
-Z_Sound.Volume = 2
-Z_Sound.Parent = game:GetService("CoreGui") -- Lo metemos en CoreGui para que el juego no lo borre
-
--- 2. Función Lite (Solo reproduce, no crea basura)
-local function PlayToggleSound()
-    Z_Sound:Play()
-end
-
--- // ⌨️ SECCIÓN DE KEYBINDS // --
-HotkeysTab:Keybind({
-    Title = "Tecla: Aimbot",
-    Desc = "Encender/Apagar el motor de apuntado.",
-    Value = "Q",
-    Callback = function()
-        _G.Z_Aimbot_Active = not _G.Z_Aimbot_Active
-        
-        PlayToggleSound() -- Cero tirones de FPS al picarle
-        
-        WindUI:Notify({
-            Title = "Z-Combat",
-            Content = _G.Z_Aimbot_Active and "Aimbot: ON [Q]" or "Aimbot: OFF [Q]",
-            Time = 1.5
-        })
-    end
-})
-
-
-
-
-
-
-
-
-
 
 
 
