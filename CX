@@ -1982,35 +1982,54 @@ CombatTab:Toggle({
 
 
 
--- // ⚙️ VARIABLES INICIALES (ACS + HI-POINT MODS) // --
-_G.Z_GunMods_Active = false
-_G.Z_GunMods_Burst = true
-_G.Z_GunMods_InfAmmo = true
-_G.Z_GunMods_NoRecoil = true
+-- // ⚙️ VARIABLES GLOBALES (COMBATE DIRECTO) // --
+_G.Z_GunMods_InfAmmo = false
+_G.Z_GunMods_Burst = false
+_G.Z_GunMods_NoRecoil = false
 
-CombatTab:Section({ Title = "Armas | Inf balas |" })
+CombatTab:Section({ Title = "Armas CSC" })
 
-CombatTab:Toggle({
-    Title = "",
-    Desc = "Aplica los hacks al instante desde el inventario.",
-    Value = _G.Z_GunMods_Active,
-    Callback = function(state) 
-        _G.Z_GunMods_Active = state 
-        if state and _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
+-- 🔵 BOTÓN 1: INF BALAS
+local InfBtn = CombatTab:Button({
+    Title = "Inf Balas",
+    Color = Color3.fromHex("#305dff"),
+    Icon = nil, -- Cambiado de "" a nil para que no ocupe espacio, we
+    Justify = "Center",
+    Callback = function()
+        _G.Z_GunMods_InfAmmo = not _G.Z_GunMods_InfAmmo
+        if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
+InfBtn:SetDesc("Balas Inf. Tira sin limites.")
+CombatTab:Space()
 
-CombatTab:Dropdown({
-    Title = "Hacks de Arma",
-    Multi = true,
-    Values = { "Burst (Ráfaga)", "Inf Ammo (Ultra)", "No Recoil (Láser)" },
-    Value = { "Burst (Ráfaga)", "Inf Ammo (Ultra)", "No Recoil (Láser)" },
-    Callback = function(options)
-        _G.Z_GunMods_Burst = table.find(options, "Burst (Ráfaga)") and true or false
-        _G.Z_GunMods_InfAmmo = table.find(options, "Inf Ammo (Ultra)") and true or false
-        _G.Z_GunMods_NoRecoil = table.find(options, "No Recoil (Láser)") and true or false
+-- 🔵 BOTÓN 2: RAPID FIRE
+local BurstBtn = CombatTab:Button({
+    Title = "Rapid Fire",
+    Color = Color3.fromHex("#305dff"),
+    Icon = nil,
+    Justify = "Center",
+    Callback = function()
+        _G.Z_GunMods_Burst = not _G.Z_GunMods_Burst
+        if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
+BurstBtn:SetDesc("Aumenta un 35% la velocidad de disparo.")
+CombatTab:Space()
+
+-- 🔵 BOTÓN 3: NO RECOIL
+local RecoilBtn = CombatTab:Button({
+    Title = "No Recoil",
+    Color = Color3.fromHex("#305dff"),
+    Icon = nil,
+    Justify = "Center",
+    Callback = function()
+        _G.Z_GunMods_NoRecoil = not _G.Z_GunMods_NoRecoil
+        if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
+    end
+})
+RecoilBtn:SetDesc("Cero retroceso. Tus balas van directo.")
+CombatTab:Space()
 
 
 
