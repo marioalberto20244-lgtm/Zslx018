@@ -1637,7 +1637,7 @@ task.spawn(function()
             Camera.CameraSubject = anchor
 
             -- 🎯 EL TRUCO (8 Studs Abajo)
-            HRP.CFrame = surfacePos * CFrame.new(0, -8, 0) 
+            HRP.CFrame = surfacePos * CFrame.new(0, -3, 0) 
             HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
             -- 👻 INVISIBILIDAD
@@ -1783,7 +1783,38 @@ HUDTab:Button({
     end
 })
 
+HUDTab:Button({
+    Title = "Botón: Hitbox v1",
+    Desc = "Genera el acceso rápido para el expansor de Hitbox.",
+    Callback = function()
+        -- Usamos la variable global que el motor reconoce
+        CreateQuickButton("Hitbox", "Z_Hitbox_Enabled", 10734950309) 
+        
+        WindUI:Notify({
+            Title = "Z-Noreste",
+            Content = "Widget de Hitbox activado",
+            Time = 2
+        })
+    end
+})
 
+-- Botón para Limpiar Pantalla (Opcional pero muy útil)
+HUDTab:Button({
+    Title = "Limpiar Todos los Botones",
+    Desc = "Elimina todos los botones flotantes de la pantalla.",
+    Callback = function()
+        for _, v in pairs(game.CoreGui:GetChildren()) do
+            if v.Name:find("Z_Widget_") then
+                v:Destroy()
+            end
+        end
+        WindUI:Notify({
+            Title = "Z-Noreste",
+            Content = "HUD Limpiado",
+            Time = 2
+        })
+    end
+})
 
 
 
