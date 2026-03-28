@@ -1773,30 +1773,28 @@ Window:Divider() -- Una línea para separar
 HUDTab:Section({ Title = "Accesos Rápidos (HUD)" })
 
 HUDTab:Button({
-    Title = "Widget: Aimbot",
-    Desc = "Crea el botón flotante para el Aimbot.",
+    Title = "Boton: Aimbot",
     Callback = function()
         -- Tu función original intacta
         CreateQuickButton("Aimbot", "Z_Aimbot_Active", 10734950309) 
         
         WindUI:Notify({
-            Title = "Z-HUD",
-            Content = "Widget de Aimbot: CONECTADO",
+            Title = "Z'v1",
+            Content = "Aimbot: On",
             Time = 2
         })
     end
 })
 
 HUDTab:Button({
-    Title = "Botón: Hitbox v1",
-    Desc = "Genera el acceso rápido para el expansor de Hitbox.",
+    Title = "Botón: Hitbox",
     Callback = function()
         -- Usamos la variable global que el motor reconoce
         CreateQuickButton("Hitbox", "Z_Hitbox_Enabled", 10734950309) 
         
         WindUI:Notify({
-            Title = "Z-Noreste",
-            Content = "Widget de Hitbox activado",
+            Title = "Z'v1",
+            Content = "Hitbox: On",
             Time = 2
         })
     end
@@ -1813,8 +1811,8 @@ HUDTab:Button({
             end
         end
         WindUI:Notify({
-            Title = "Z-Noreste",
-            Content = "HUD Limpiado",
+            Title = "Z'v1",
+            Content = "Botones Eliminados",
             Time = 2
         })
     end
@@ -1946,12 +1944,11 @@ CombatTab:Section({ Title = "Anti Hit" })
 
 CombatTab:Toggle({
     Title = "Anti Hit ⏳",
-    Desc = "Ahora sí permite hacer daño y agarrar cosas.",
     Value = _G.DennisEnabled,
     Callback = function(state)
         _G.DennisEnabled = state
         WindUI:Notify({
-            Title = "Z-Squad",
+            Title = "Z'v1",
             Content = state and "Onn !" or "Off !",
             Time = 1.5
         })
