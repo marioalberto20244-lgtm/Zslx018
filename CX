@@ -1960,6 +1960,45 @@ CombatTab:Dropdown({
 
 
 
+_G.DennisEnabled = false
+
+MiscTab:Toggle({
+    Title = "Modo Dennis (Assassin Fix)",
+    Desc = "Ahora sí permite hacer daño y agarrar cosas.",
+    Value = _G.DennisEnabled,
+    Callback = function(state)
+        _G.DennisEnabled = state
+        WindUI:Notify({
+            Title = "Z-Squad",
+            Content = state and "Fantasma con daño activado!" or "De vuelta a la carne.",
+            Time = 1.5
+        })
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
