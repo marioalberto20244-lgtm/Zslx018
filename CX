@@ -769,9 +769,12 @@ end
 
 
 
--- MOTOR ESP 2D BOX + HEALTH BAR (Z-SQUAD LITE ENGINE - UPDATE COLORS)
-_G.ESP_Boxes = false
-_G.ESP_Color = "Red" -- Red, Green, Blue, Rainbow
+-- // ⚙️ VARIABLES GLOBALES (ESP PRO + TEAM CHECK) // --
+_G.Z_ESP_Master = false
+_G.Z_ESP_Boxes = true
+_G.Z_ESP_HealthBar = true
+_G.Z_ESP_TeamCheck = false -- <--- Variable única para el ESP (No se cruza con Tracers)
+_G.Z_ESP_Color = Color3.fromRGB(0, 255, 0)
 
 task.spawn(function()
     local RunService = game:GetService("RunService")
@@ -780,116 +783,124 @@ task.spawn(function()
     local CoreGui = game:GetService("CoreGui")
     local LP = Players.LocalPlayer
 
-    if CoreGui:FindFirstChild("Z_ESP_LITE") then
-        CoreGui.Z_ESP_LITE:Destroy()
-    end
+    -- Limpieza por si reinicias el script
+    if CoreGui:FindFirstChild("Z_ESP_LITE") then CoreGui.Z_ESP_LITE:Destroy() end
 
-    local ESPGui = Instance.new("ScreenGui")
+    local ESPGui = Instance.new("ScreenGui", CoreGui)
     ESPGui.Name = "Z_ESP_LITE"
     ESPGui.IgnoreGuiInset = true 
-    ESPGui.Parent = CoreGui
 
     local ESP_Data = {}
+
+    -- // 🛡️ FUNCIÓN DE BANDOS EXCLUSIVA PARA ESP // --
+    local function GetSideESP(player)
+        local team = player.Team and player.Team.Name or ""
+        local law = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civ = {"Civilian", "Civil"}
+        
+        if table.find(law, team) then return "Law" end
+        if table.find(civ, team) then return "Civil" end
+        return "Neutral"
+    end
 
     local function CreateESP(player)
         if ESP_Data[player] then return end
         
-        local box = Instance.new("Frame")
+        local box = Instance.new("Frame", ESPGui)
         box.BackgroundColor3 = Color3.new(1,1,1)
         box.BackgroundTransparency = 1
         box.Visible = false
-        box.Parent = ESPGui
         
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(255, 0, 0)
+        local stroke = Instance.new("UIStroke", box)
         stroke.Thickness = 1.5
-        stroke.Parent = box
+        stroke.Color = _G.Z_ESP_Color
 
-        local bg = Instance.new("Frame")
-        bg.BackgroundColor3 = Color3.new(0, 0, 0)
+        local bg = Instance.new("Frame", ESPGui)
+        bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        bg.BackgroundTransparency = 0.5
         bg.BorderSizePixel = 0
         bg.Visible = false
-        bg.Parent = ESPGui
 
-        local fill = Instance.new("Frame")
+        local fill = Instance.new("Frame", bg)
         fill.AnchorPoint = Vector2.new(0, 1)
         fill.Position = UDim2.new(0, 0, 1, 0)
         fill.Size = UDim2.new(1, 0, 1, 0)
         fill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
         fill.BorderSizePixel = 0
-        fill.Parent = bg
 
-        -- Guardamos el Stroke también para cambiarle el color rápido
         ESP_Data[player] = {Box = box, Bg = bg, Fill = fill, Stroke = stroke}
     end
 
     local function RemoveESP(player)
         if ESP_Data[player] then
-            ESP_Data[player].Box:Destroy()
-            ESP_Data[player].Bg:Destroy()
+            pcall(function()
+                ESP_Data[player].Box:Destroy()
+                ESP_Data[player].Bg:Destroy()
+            end)
             ESP_Data[player] = nil
         end
     end
 
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP then CreateESP(p) end
-    end
-    Players.PlayerAdded:Connect(function(p)
-        if p ~= LP then CreateESP(p) end
-    end)
+    -- Inicializar
+    for _, p in pairs(Players:GetPlayers()) do if p ~= LP then CreateESP(p) end end
+    Players.PlayerAdded:Connect(function(p) if p ~= LP then CreateESP(p) end end)
     Players.PlayerRemoving:Connect(RemoveESP)
 
+    -- // 🔄 MOTOR DE RENDER // --
     RunService.RenderStepped:Connect(function()
-        -- 🎨 GENERADOR DE COLOR (Se calcula una sola vez por frame para evitar lag)
-        local rainbowColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local selectedColor = Color3.fromRGB(255, 0, 0)
-
-        if _G.ESP_Color == "Red" then selectedColor = Color3.fromRGB(255, 0, 0)
-        elseif _G.ESP_Color == "Green" then selectedColor = Color3.fromRGB(0, 255, 0)
-        elseif _G.ESP_Color == "Blue" then selectedColor = Color3.fromRGB(0, 0, 255)
-        elseif _G.ESP_Color == "Rainbow" then selectedColor = rainbowColor end
+        local mySide = GetSideESP(LP)
 
         for player, data in pairs(ESP_Data) do
-            if not _G.ESP_Boxes then
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local head = char and char:FindFirstChild("Head")
+
+            -- 1. VALIDACIÓN BÁSICA (Master, Muerto, Desconectado)
+            if not _G.Z_ESP_Master or not char or not hum or not hrp or not head or hum.Health <= 0 then
                 data.Box.Visible = false
                 data.Bg.Visible = false
                 continue
             end
 
-            local char = player.Character
-            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") then
-                local hrp = char.HumanoidRootPart
-                local head = char.Head
-                local hum = char.Humanoid
+            -- 2. 🤖 SMART TEAM CHECK (ESPECÍFICO DE ESP)
+            if _G.Z_ESP_TeamCheck then
+                local targetSide = GetSideESP(player)
+                -- Si somos del mismo equipo, ocultamos el ESP de este jugador
+                if mySide == targetSide and mySide ~= "Neutral" then
+                    data.Box.Visible = false
+                    data.Bg.Visible = false
+                    continue
+                end
+            end
 
-                if hum.Health > 0 then
-                    local headPos, onScreen1 = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                    local legPos, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+            local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local legPos, _ = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
 
-                    if onScreen1 or onScreen2 then
-                        local height = math.abs(headPos.Y - legPos.Y)
-                        local width = height / 1.8 
+            if onScreen then
+                local height = math.abs(headPos.Y - legPos.Y)
+                local width = height / 1.8 
 
-                        -- Aplicar color seleccionado a la caja
-                        data.Stroke.Color = selectedColor
-
-                        data.Box.Size = UDim2.new(0, width, 0, height)
-                        data.Box.Position = UDim2.new(0, headPos.X - (width / 2), 0, headPos.Y)
-                        data.Box.Visible = true
-
-                        data.Bg.Size = UDim2.new(0, 2, 0, height) 
-                        data.Bg.Position = UDim2.new(0, headPos.X - (width / 2) - 3, 0, headPos.Y) 
-                        data.Bg.Visible = true
-
-                        local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                        data.Fill.Size = data.Fill.Size:Lerp(UDim2.new(1, 0, hpPercent, 0), 0.15)
-                        data.Fill.BackgroundColor3 = Color3.fromHSV(hpPercent * 0.3, 1, 1)
-                    else
-                        data.Box.Visible = false
-                        data.Bg.Visible = false
-                    end
+                -- 📦 DIBUJO DE LA CAJA
+                if _G.Z_ESP_Boxes then
+                    data.Stroke.Color = _G.Z_ESP_Color 
+                    data.Box.Size = UDim2.new(0, width, 0, height)
+                    data.Box.Position = UDim2.new(0, headPos.X - (width / 2), 0, headPos.Y)
+                    data.Box.Visible = true
                 else
                     data.Box.Visible = false
+                end
+
+                -- 🏥 DIBUJO DE BARRA DE VIDA
+                if _G.Z_ESP_HealthBar then
+                    data.Bg.Size = UDim2.new(0, 2, 0, height) 
+                    data.Bg.Position = UDim2.new(0, headPos.X - (width / 2) - 4, 0, headPos.Y) 
+                    data.Bg.Visible = true
+
+                    local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    data.Fill.Size = UDim2.new(1, 0, hpPercent, 0)
+                    data.Fill.BackgroundColor3 = Color3.fromHSV(hpPercent * 0.3, 1, 1)
+                else
                     data.Bg.Visible = false
                 end
             else
@@ -921,19 +932,13 @@ end)
 
 
 
-
-
-
-
-
-
-
-
-
--- MOTOR ESP TRACERS (Z-SQUAD 360° ANTI-SHAKE LITE ENGINE - UPDATE)
-_G.TracersEnabled = false
-_G.TracerOrigin = "Abajo" -- Arriba, Centro, Abajo
-_G.TracerColor = "Red" -- Red, Green, Blue, Rainbow
+-- // ⚙️ VARIABLES GLOBALES (TRACERS PRO + TEAM CHECK) // --
+_G.Z_Tracers_Enabled = false
+_G.Z_Tracer_TeamCheck = false -- Variable única para el filtro de equipos
+_G.Z_Tracer_Origin = "Abajo"
+_G.Z_Tracer_Color = Color3.fromRGB(0, 255, 0)
+_G.Z_Tracer_Width = 1.5
+_G.Z_Tracer_Transparency = 0.5
 
 task.spawn(function()
     local RunService = game:GetService("RunService")
@@ -942,23 +947,35 @@ task.spawn(function()
     local CoreGui = game:GetService("CoreGui")
     local LP = Players.LocalPlayer
 
+    -- Limpieza de seguridad
     if CoreGui:FindFirstChild("Z_TRACERS_LITE") then
         CoreGui.Z_TRACERS_LITE:Destroy()
     end
 
-    local TracerGui = Instance.new("ScreenGui")
+    local TracerGui = Instance.new("ScreenGui", CoreGui)
     TracerGui.Name = "Z_TRACERS_LITE"
     TracerGui.IgnoreGuiInset = true 
-    TracerGui.Parent = CoreGui
 
     local Tracer_Data = {}
+
+    -- // 🛡️ FUNCIÓN DE DETECCIÓN DE BANDOS // --
+    local function GetSide(targetPlayer)
+        local team = targetPlayer.Team and targetPlayer.Team.Name or ""
+        local lawTeams = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civTeams = {"Civilian", "Civil"}
+        
+        if table.find(lawTeams, team) then return "Law" end
+        if table.find(civTeams, team) then return "Civil" end
+        return "Neutral"
+    end
 
     local function CreateTracer(player)
         if Tracer_Data[player] then return end
         local line = Instance.new("Frame")
         line.Name = "TracerLine"
         line.AnchorPoint = Vector2.new(0.5, 0.5) 
-        line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        line.BackgroundColor3 = _G.Z_Tracer_Color
+        line.BackgroundTransparency = _G.Z_Tracer_Transparency
         line.BorderSizePixel = 0
         line.Visible = false
         line.Parent = TracerGui
@@ -967,224 +984,81 @@ task.spawn(function()
 
     local function RemoveTracer(player)
         if Tracer_Data[player] then
-            Tracer_Data[player]:Destroy()
+            pcall(function() Tracer_Data[player]:Destroy() end)
             Tracer_Data[player] = nil
         end
     end
 
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP then CreateTracer(p) end
-    end
-    Players.PlayerAdded:Connect(function(p)
-        if p ~= LP then CreateTracer(p) end
-    end)
+    -- Inicialización
+    for _, p in pairs(Players:GetPlayers()) do if p ~= LP then CreateTracer(p) end end
+    Players.PlayerAdded:Connect(function(p) if p ~= LP then CreateTracer(p) end end)
     Players.PlayerRemoving:Connect(RemoveTracer)
 
+    -- // 🔄 MOTOR DE RENDER 360° (LITE ENGINE) // --
     RunService.RenderStepped:Connect(function()
         local ViewportSize = Camera.ViewportSize
+        local mySide = GetSide(LP)
         
-        -- 🎨 COLOR LOGIC (Calculado una vez por frame)
-        local rainbowColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local selectedColor = Color3.fromRGB(255, 0, 0)
-        if _G.TracerColor == "Red" then selectedColor = Color3.fromRGB(255, 0, 0)
-        elseif _G.TracerColor == "Green" then selectedColor = Color3.fromRGB(0, 255, 0)
-        elseif _G.TracerColor == "Blue" then selectedColor = Color3.fromRGB(0, 0, 255)
-        elseif _G.TracerColor == "Rainbow" then selectedColor = rainbowColor end
-
-        -- 📍 ORIGIN LOGIC
-        local Origin = Vector2.new(ViewportSize.X / 2, ViewportSize.Y) -- Default: Abajo
-        if _G.TracerOrigin == "Arriba" then
+        -- 📍 DETERMINAR ORIGEN
+        local Origin = Vector2.new(ViewportSize.X / 2, ViewportSize.Y)
+        if _G.Z_Tracer_Origin == "Arriba" then
             Origin = Vector2.new(ViewportSize.X / 2, 0)
-        elseif _G.TracerOrigin == "Centro" then
+        elseif _G.Z_Tracer_Origin == "Centro" then
             Origin = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
         end
 
         for player, line in pairs(Tracer_Data) do
-            if not _G.TracersEnabled then
+            local char = player.Character
+            local head = char and char:FindFirstChild("Head")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+            -- 1. VALIDACIÓN BÁSICA
+            if not _G.Z_Tracers_Enabled or not head or not hum or hum.Health <= 0 then
                 line.Visible = false
                 continue
             end
 
-            local char = player.Character
-            if char and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") then
-                local head = char.Head
-                local hum = char.Humanoid
-
-                if hum.Health > 0 then
-                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                    local Target
-
-                    if onScreen then
-                        Target = Vector2.new(headPos.X, headPos.Y)
-                    else
-                        local centerScreen = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
-                        local fakePos = Vector2.new(headPos.X, headPos.Y)
-                        if headPos.Z < 0 then
-                            fakePos = Vector2.new(
-                                centerScreen.X + (centerScreen.X - headPos.X), 
-                                centerScreen.Y + (centerScreen.Y - headPos.Y)
-                            )
-                        end
-                        local direction = (fakePos - centerScreen).Unit
-                        Target = centerScreen + (direction * (ViewportSize.X * 1.5))
-                    end
-                    
-                    local Distance = (Target - Origin).Magnitude
-                    local Center = (Target + Origin) / 2
-                    local Angle = math.atan2(Target.Y - Origin.Y, Target.X - Origin.X)
-
-                    line.Size = UDim2.new(0, Distance, 0, 1.5) 
-                    line.Position = UDim2.new(0, Center.X, 0, Center.Y)
-                    line.Rotation = math.deg(Angle)
-                    line.BackgroundColor3 = selectedColor
-                    line.Visible = true
-                else
-                    line.Visible = false 
+            -- 2. 🤖 SMART TEAM CHECK (FILTRO AUTOMÁTICO)
+            if _G.Z_Tracer_TeamCheck then
+                local targetSide = GetSide(player)
+                -- Si somos del mismo equipo (y no somos neutrales), ocultamos la línea
+                if mySide == targetSide and mySide ~= "Neutral" then
+                    line.Visible = false
+                    continue
                 end
+            end
+
+            local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            local Target
+
+            -- LÓGICA 360° ANTI-SHAKE
+            if onScreen then
+                Target = Vector2.new(headPos.X, headPos.Y)
             else
-                line.Visible = false
-            end
-        end
-    end)
-end)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- [[ MOTOR ESP 3D DRAWING: BY Z-SLX (PRO LITE) ]]
-_G.ESP3D_Enabled = false
-_G.ESP3D_Color = "Red" -- Red, Green, Blue, Rainbow
-
-task.spawn(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LP = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
-
-    local Boxes = {}
-
-    -- Función para crear las 12 líneas usando la Drawing Lib
-    local function CreateBox()
-        local lines = {}
-        for i = 1, 12 do
-            local line = Drawing.new("Line")
-            line.Thickness = 1.5
-            line.Color = Color3.fromRGB(255, 0, 0)
-            line.Transparency = 1
-            line.Visible = false
-            lines[i] = line
-        end
-        return lines
-    end
-
-    -- Limpieza cuando un jugador se va
-    local function RemoveESP(player)
-        if Boxes[player] then
-            for _, line in pairs(Boxes[player]) do
-                line:Remove() -- Drawing lib usa :Remove() no :Destroy()
-            end
-            Boxes[player] = nil
-        end
-    end
-
-    Players.PlayerRemoving:Connect(RemoveESP)
-
-    -- [[ LOOP MAESTRO: MATEMÁTICAS 3D ]]
-    RunService.RenderStepped:Connect(function()
-        -- 🎨 GENERADOR DE COLOR
-        local rainbow = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local color = Color3.fromRGB(255, 0, 0)
-        
-        if _G.ESP3D_Color == "Green" then color = Color3.fromRGB(0, 255, 0)
-        elseif _G.ESP3D_Color == "Blue" then color = Color3.fromRGB(0, 0, 255)
-        elseif _G.ESP3D_Color == "Rainbow" then color = rainbow end
-
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LP then
-                local char = player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChild("Humanoid")
-
-                if _G.ESP3D_Enabled and hrp and hum and hum.Health > 0 then
-                    if not Boxes[player] then Boxes[player] = CreateBox() end
-                    local lines = Boxes[player]
-                    
-                    local size = Vector3.new(3.8, 5.5, 2) -- Tamaño de la caja
-                    local cf = hrp.CFrame
-                    
-                    -- Puntos del cubo 3D proyectados a la pantalla
-                    local points = {
-                        Camera:WorldToViewportPoint((cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(size.X/2, size.Y/2, size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2)).Position),
-                        Camera:WorldToViewportPoint((cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2)).Position)
-                    }
-
-                    local function drawLine(line, p1, p2)
-                        if p1.Z > 0 and p2.Z > 0 then
-                            line.From = Vector2.new(p1.X, p1.Y)
-                            line.To = Vector2.new(p2.X, p2.Y)
-                            line.Color = color
-                            line.Visible = true
-                        else
-                            line.Visible = false
-                        end
-                    end
-
-                    -- Conectar las 12 líneas
-                    drawLine(lines[1], points[1], points[2])
-                    drawLine(lines[2], points[2], points[4])
-                    drawLine(lines[3], points[4], points[3])
-                    drawLine(lines[4], points[3], points[1])
-                    drawLine(lines[5], points[5], points[6])
-                    drawLine(lines[6], points[6], points[8])
-                    drawLine(lines[7], points[8], points[7])
-                    drawLine(lines[8], points[7], points[5])
-                    drawLine(lines[9], points[1], points[5])
-                    drawLine(lines[10], points[2], points[6])
-                    drawLine(lines[11], points[3], points[7])
-                    drawLine(lines[12], points[4], points[8])
-                else
-                    -- Ocultar si está muerto o desactivado
-                    if Boxes[player] then
-                        for _, line in pairs(Boxes[player]) do line.Visible = false end
-                    end
+                local centerScreen = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
+                local fakePos = Vector2.new(headPos.X, headPos.Y)
+                if headPos.Z < 0 then
+                    fakePos = Vector2.new(
+                        centerScreen.X + (centerScreen.X - headPos.X), 
+                        centerScreen.Y + (centerScreen.Y - headPos.Y)
+                    )
                 end
+                local direction = (fakePos - centerScreen).Unit
+                Target = centerScreen + (direction * (ViewportSize.X * 1.5))
             end
+            
+            -- MATEMÁTICAS DE DIBUJO
+            local Distance = (Target - Origin).Magnitude
+            local Center = (Target + Origin) / 2
+            local Angle = math.atan2(Target.Y - Origin.Y, Target.X - Origin.X)
+
+            -- ACTUALIZACIÓN EN TIEMPO REAL
+            line.Size = UDim2.new(0, Distance, 0, _G.Z_Tracer_Width or 1.5) 
+            line.BackgroundTransparency = _G.Z_Tracer_Transparency or 0.5
+            line.BackgroundColor3 = _G.Z_Tracer_Color
+            line.Position = UDim2.new(0, Center.X, 0, Center.Y)
+            line.Rotation = math.deg(Angle)
+            line.Visible = true
         end
     end)
 end)
@@ -1213,25 +1087,10 @@ end)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- [[ MOTOR ESP 3D WIREFRAME: Z-SQUAD LITE ]]
-_G.ESP3D_ENABLED = false
-_G.ESP3D_COLOR = "Red"
-_G.ESP3D_THICKNESS = 0.04
-_G.ESP3D_TRANS = 0
+-- // ⚙️ VARIABLES GLOBALES (ESP 3D X-RAY) // --
+_G.Z_ESP3D_Enabled = false
+_G.Z_ESP3D_TeamCheck = false 
+_G.Z_ESP3D_Color = Color3.fromRGB(255, 0, 0)
 
 task.spawn(function()
     local Players = game:GetService("Players")
@@ -1245,40 +1104,76 @@ task.spawn(function()
 
     local espData = {}
 
+    -- // 🛡️ DETECTOR DE BANDOS (FULANITO 3) // --
+    local function GetSide3D(player)
+        local team = player.Team and player.Team.Name or ""
+        local law = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civ = {"Civilian", "Civil"}
+        
+        if table.find(law, team) then return "Law" end
+        if table.find(civ, team) then return "Civil" end
+        return "Neutral"
+    end
+
     local function Create3D(player)
         if player == LP or espData[player] then return end
-        local box = Instance.new("SelectionBox")
-        box.Name = "Z_3D_Box"
+        
+        -- USAMOS ADORNMENT PARA QUE TRANSPASE PAREDES SIN ERRORES
+        local box = Instance.new("BoxHandleAdornment")
+        box.Name = "Z_3D_Wire"
         box.AlwaysOnTop = true
-        box.SurfaceTransparency = 1 -- Solo líneas
+        box.ZIndex = 10
+        box.Transparency = 0.7 -- Un poco transparente para que se vea fino
         box.Parent = Storage
         espData[player] = box
     end
 
     for _, p in pairs(Players:GetPlayers()) do Create3D(p) end
     Players.PlayerAdded:Connect(Create3D)
-    Players.PlayerRemoving:Connect(function(p) if espData[p] then espData[p]:Destroy() espData[p] = nil end end)
+    Players.PlayerRemoving:Connect(function(p) 
+        if espData[p] then 
+            pcall(function() espData[p]:Destroy() end) 
+            espData[p] = nil 
+        end 
+    end)
 
+    -- // 🔄 MOTOR DE RENDER 3D X-RAY // --
     RunService.RenderStepped:Connect(function()
-        local rainbow = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local color = Color3.fromRGB(255,0,0)
-        if _G.ESP3D_COLOR == "Green" then color = Color3.fromRGB(0,255,0)
-        elseif _G.ESP3D_COLOR == "Blue" then color = Color3.fromRGB(0,0,255)
-        elseif _G.ESP3D_COLOR == "Rainbow" then color = rainbow end
+        local mySide = GetSide3D(LP)
 
         for player, box in pairs(espData) do
             local char = player.Character
-            local alive = char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0
-            if _G.ESP3D_ENABLED and alive then
-                box.Adornee = char
-                box.Color3 = color
-                box.LineThickness = _G.ESP3D_THICKNESS
-                box.Transparency = _G.ESP3D_TRANS
-                box.Visible = true
-            else
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+            -- VALIDACIÓN
+            if not _G.Z_ESP3D_Enabled or not char or not hrp or not hum or hum.Health <= 0 then
                 box.Visible = false
                 box.Adornee = nil
+                continue
             end
+
+            -- SMART TEAM CHECK
+            if _G.Z_ESP3D_TeamCheck then
+                local targetSide = GetSide3D(player)
+                if mySide == targetSide and mySide ~= "Neutral" then
+                    box.Visible = false
+                    box.Adornee = nil
+                    continue
+                end
+            end
+
+            -- DIBUJO QUE TRANSPASA PAREDES
+            pcall(function()
+                box.Adornee = hrp -- Se ancla al pecho
+                box.Color3 = _G.Z_ESP3D_Color
+                
+                -- Ajustamos el tamaño al cuerpo del mono
+                box.Size = char:GetExtentsSize() 
+                box.CFrame = CFrame.new(0, 0, 0) -- Centrado al Adornee
+                
+                box.Visible = true
+            end)
         end
     end)
 end)
@@ -1305,21 +1200,10 @@ end)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
--- [[ MOTOR SKELETON ESP: Z-SQUAD LITE ENGINE (ULTRA FIX) ]]
-_G.Skeleton_Enabled = false
-_G.Skeleton_Color = "Red" 
+-- // ⚙️ VARIABLES GLOBALES (SKELETON PRO CONFIG) // --
+_G.Z_Skeleton_Enabled = false
+_G.Z_Skeleton_TeamCheck = false -- <--- Fulanito 4: Independiente de los otros
+_G.Z_Skeleton_Color = Color3.fromRGB(0, 255, 0)
 
 task.spawn(function()
     local Players = game:GetService("Players")
@@ -1327,10 +1211,20 @@ task.spawn(function()
     local Camera = workspace.CurrentCamera
     local LP = Players.LocalPlayer
 
-    local Skeletons = {}
+    local Z_Skeleton_Data = {}
 
-    -- Función para crear una línea (Drawing Lib)
-    local function CreateLine()
+    -- // 🛡️ DETECTOR DE BANDOS (EXCLUSIVO SKELETON) // --
+    local function GetSideSkel(player)
+        local team = player.Team and player.Team.Name or ""
+        local law = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civ = {"Civilian", "Civil"}
+        if table.find(law, team) then return "Law" end
+        if table.find(civ, team) then return "Civil" end
+        return "Neutral"
+    end
+
+    -- Función para crear líneas (Drawing)
+    local function Z_CreateSkelLine()
         local line = Drawing.new("Line")
         line.Thickness = 1.5 
         line.Transparency = 1
@@ -1338,35 +1232,28 @@ task.spawn(function()
         return line
     end
 
-    -- Estructura de huesos
-    local function CreateSkeleton()
+    -- Estructura de huesos única
+    local function Z_BuildSkeleton()
         return {
-            Spine = {CreateLine(), CreateLine()}, 
-            Arms = {CreateLine(), CreateLine(), CreateLine(), CreateLine()}, 
-            Legs = {CreateLine(), CreateLine(), CreateLine(), CreateLine()}  
+            Spine = {Z_CreateSkelLine(), Z_CreateSkelLine()}, 
+            Arms = {Z_CreateSkelLine(), Z_CreateSkelLine(), Z_CreateSkelLine(), Z_CreateSkelLine()}, 
+            Legs = {Z_CreateSkelLine(), Z_CreateSkelLine(), Z_CreateSkelLine(), Z_CreateSkelLine()}  
         }
     end
 
-    -- Limpieza total de un jugador
-    local function ClearSkeleton(player)
-        if Skeletons[player] then
-            for _, group in pairs(Skeletons[player]) do
-                for _, line in pairs(group) do
-                    line.Visible = false
-                    line:Remove() 
-                end
+    local function Z_ClearSkeleton(player)
+        if Z_Skeleton_Data[player] then
+            for _, group in pairs(Z_Skeleton_Data[player]) do
+                for _, line in pairs(group) do line:Remove() end
             end
-            Skeletons[player] = nil
+            Z_Skeleton_Data[player] = nil
         end
     end
 
-    -- Función para conectar con protección anti-error
-    local function Connect(line, p1, p2, color)
-        -- pcall para que si la parte desaparece justo ahora, no truene el script
-        local success, err = pcall(function()
+    local function Z_JoinNodes(line, p1, p2, color)
+        local success, _ = pcall(function()
             local pos1, vis1 = Camera:WorldToViewportPoint(p1.Position)
             local pos2, vis2 = Camera:WorldToViewportPoint(p2.Position)
-            
             if vis1 and vis2 then
                 line.From = Vector2.new(pos1.X, pos1.Y)
                 line.To = Vector2.new(pos2.X, pos2.Y)
@@ -1379,60 +1266,61 @@ task.spawn(function()
         if not success then line.Visible = false end
     end
 
-    -- Evento de salida
-    Players.PlayerRemoving:Connect(ClearSkeleton)
+    Players.PlayerRemoving:Connect(Z_ClearSkeleton)
 
-    -- [[ EL LOOP MAESTRO: FIX DE PERSISTENCIA ]]
+    -- // 🔄 MOTOR DE RENDER SKELETON // --
     RunService.RenderStepped:Connect(function()
-        local rainbow = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local color = Color3.fromRGB(255, 0, 0)
-        if _G.Skeleton_Color == "Green" then color = Color3.fromRGB(0, 255, 0)
-        elseif _G.Skeleton_Color == "Blue" then color = Color3.fromRGB(0, 0, 255)
-        elseif _G.Skeleton_Color == "Rainbow" then color = rainbow end
+        local mySide = GetSideSkel(LP)
+        local color = _G.Z_Skeleton_Color
 
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LP then
                 local char = player.Character
-                local hum = char and char:FindFirstChild("Humanoid")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-                -- VALIDACIÓN AGRESIVA: Si no hay personaje, no hay vida o el ESP está OFF
-                if _G.Skeleton_Enabled and char and char.Parent and hum and hum.Health > 0 and hrp then
-                    if not Skeletons[player] then Skeletons[player] = CreateSkeleton() end
-                    local skel = Skeletons[player]
+                -- 1. VALIDACIÓN BÁSICA
+                if _G.Z_Skeleton_Enabled and char and char.Parent and hum and hum.Health > 0 and hrp then
+                    
+                    -- 2. 🤖 SMART TEAM CHECK (FULANITO 4)
+                    if _G.Z_Skeleton_TeamCheck then
+                        local targetSide = GetSideSkel(player)
+                        if mySide == targetSide and mySide ~= "Neutral" then
+                            if Z_Skeleton_Data[player] then
+                                for _, g in pairs(Z_Skeleton_Data[player]) do for _, l in pairs(g) do l.Visible = false end end
+                            end
+                            continue
+                        end
+                    end
+
+                    if not Z_Skeleton_Data[player] then Z_Skeleton_Data[player] = Z_BuildSkeleton() end
+                    local skel = Z_Skeleton_Data[player]
 
                     -- DETECCIÓN R15 / R6
                     if char:FindFirstChild("UpperTorso") then -- R15
-                        Connect(skel.Spine[1], char.Head, char.UpperTorso, color)
-                        Connect(skel.Spine[2], char.UpperTorso, char.LowerTorso, color)
-                        Connect(skel.Arms[1], char.UpperTorso, char.LeftUpperArm, color)
-                        Connect(skel.Arms[2], char.LeftUpperArm, char.LeftHand, color)
-                        Connect(skel.Arms[3], char.UpperTorso, char.RightUpperArm, color)
-                        Connect(skel.Arms[4], char.RightUpperArm, char.RightHand, color)
-                        Connect(skel.Legs[1], char.LowerTorso, char.LeftUpperLeg, color)
-                        Connect(skel.Legs[2], char.LeftUpperLeg, char.LeftFoot, color)
-                        Connect(skel.Legs[3], char.LowerTorso, char.RightUpperLeg, color)
-                        Connect(skel.Legs[4], char.RightUpperLeg, char.RightFoot, color)
+                        Z_JoinNodes(skel.Spine[1], char.Head, char.UpperTorso, color)
+                        Z_JoinNodes(skel.Spine[2], char.UpperTorso, char.LowerTorso, color)
+                        Z_JoinNodes(skel.Arms[1], char.UpperTorso, char.LeftUpperArm, color)
+                        Z_JoinNodes(skel.Arms[2], char.LeftUpperArm, char.LeftHand, color)
+                        Z_JoinNodes(skel.Arms[3], char.UpperTorso, char.RightUpperArm, color)
+                        Z_JoinNodes(skel.Arms[4], char.RightUpperArm, char.RightHand, color)
+                        Z_JoinNodes(skel.Legs[1], char.LowerTorso, char.LeftUpperLeg, color)
+                        Z_JoinNodes(skel.Legs[2], char.LeftUpperLeg, char.LeftFoot, color)
+                        Z_JoinNodes(skel.Legs[3], char.LowerTorso, char.RightUpperLeg, color)
+                        Z_JoinNodes(skel.Legs[4], char.RightUpperLeg, char.RightFoot, color)
                     elseif char:FindFirstChild("Torso") then -- R6
-                        Connect(skel.Spine[1], char.Head, char.Torso, color)
-                        Connect(skel.Arms[1], char.Torso, char["Left Arm"], color)
-                        Connect(skel.Arms[3], char.Torso, char["Right Arm"], color)
-                        Connect(skel.Legs[1], char.Torso, char["Left Leg"], color)
-                        Connect(skel.Legs[3], char.Torso, char["Right Leg"], color)
+                        Z_JoinNodes(skel.Spine[1], char.Head, char.Torso, color)
+                        Z_JoinNodes(skel.Arms[1], char.Torso, char["Left Arm"], color)
+                        Z_JoinNodes(skel.Arms[3], char.Torso, char["Right Arm"], color)
+                        Z_JoinNodes(skel.Legs[1], char.Torso, char["Left Leg"], color)
+                        Z_JoinNodes(skel.Legs[3], char.Torso, char["Right Leg"], color)
                         
-                        -- Apagamos las que sobran
-                        skel.Spine[2].Visible = false
-                        skel.Arms[2].Visible = false
-                        skel.Arms[4].Visible = false
-                        skel.Legs[2].Visible = false
-                        skel.Legs[4].Visible = false
+                        -- Apagamos R15 extras
+                        skel.Spine[2].Visible, skel.Arms[2].Visible, skel.Arms[4].Visible, skel.Legs[2].Visible, skel.Legs[4].Visible = false, false, false, false, false
                     end
                 else
-                    -- SI ALGO FALLA, APAGAMOS TODO AL INSTANTE
-                    if Skeletons[player] then
-                        for _, group in pairs(Skeletons[player]) do
-                            for _, line in pairs(group) do line.Visible = false end
-                        end
+                    if Z_Skeleton_Data[player] then
+                        for _, g in pairs(Z_Skeleton_Data[player]) do for _, l in pairs(g) do l.Visible = false end end
                     end
                 end
             end
@@ -1464,122 +1352,10 @@ end)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- [[ MOTOR ESP HEIGLE PRO: BY Z-SLX ]]
-_G.ESP_High_Enabled = false
-_G.ESP_High_Color = "Red"
-_G.ESP_High_Fill = 0.5    -- Por defecto modo 2
-_G.ESP_High_Outline = 0   -- Por defecto modo 2 (Con bordes)
-
-task.spawn(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LP = Players.LocalPlayer
-
-    -- Función para meter el brillo al personaje
-    local function ApplyHigh(player)
-        if player == LP then return end
-        local function setup(char)
-            local h = char:FindFirstChild("Z_High") or Instance.new("Highlight")
-            h.Name = "Z_High"
-            h.Adornee = char
-            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- PAREDES BYPASS
-            h.Parent = char
-        end
-        if player.Character then setup(player.Character) end
-        player.CharacterAdded:Connect(setup)
-    end
-
-    for _, p in pairs(Players:GetPlayers()) do ApplyHigh(p) end
-    Players.PlayerAdded:Connect(ApplyHigh)
-
-    -- LOOP MAESTRO: Control total de los Modos 1, 2, 3
-    RunService.RenderStepped:Connect(function()
-        -- Lógica de Color
-        local rainbow = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        local color = Color3.fromRGB(255, 0, 0)
-        
-        if _G.ESP_High_Color == "Green" then color = Color3.fromRGB(0, 255, 0)
-        elseif _G.ESP_High_Color == "Blue" then color = Color3.fromRGB(0, 0, 255)
-        elseif _G.ESP_High_Color == "Rainbow" then color = rainbow end
-
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character then
-                local h = p.Character:FindFirstChild("Z_High")
-                if h then
-                    -- Aplicamos los estados desde tus Inputs
-                    h.Enabled = _G.ESP_High_Enabled
-                    h.FillColor = color
-                    h.OutlineColor = color
-                    
-                    -- Sincronización con tus modos de texto
-                    h.FillTransparency = _G.ESP_High_Fill
-                    h.OutlineTransparency = _G.ESP_High_Outline
-                end
-            end
-        end
-    end)
-end)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- [[ MOTOR TEAM ESP v3: Z-SQUAD ROLE ENGINE ]]
-_G.ESP_Team_Enabled = false
-_G.ESP_Team_MaxDist = 600
+-- // ⚙️ VARIABLES GLOBALES (TEAM NAMES CONFIG) // --
+_G.Z_ESP_TeamNames_Enabled = false
+_G.Z_ESP_TeamNames_SmartCheck = false -- <--- Fulanito 5: Único para este motor
+_G.Z_ESP_TeamNames_MaxDist = 600
 
 task.spawn(function()
     local Players = game:GetService("Players")
@@ -1587,10 +1363,20 @@ task.spawn(function()
     local Camera = workspace.CurrentCamera
     local LP = Players.LocalPlayer
 
-    local Labels = {}
+    local Z_TeamLabels = {}
+
+    -- // 🛡️ DETECTOR DE BANDOS (EXCLUSIVO TEAM NAMES) // --
+    local function Z_GetTeamSide(player)
+        local team = player.Team and player.Team.Name or ""
+        local law = {"Border Patrol", "US Army", "FBI", "BORTAC", "State Trooper", "HSI"}
+        local civ = {"Civilian", "Civil"}
+        if table.find(law, team) then return "Law" end
+        if table.find(civ, team) then return "Civil" end
+        return "Neutral"
+    end
 
     -- Función para crear el texto (Drawing Lib)
-    local function CreateLabel()
+    local function Z_CreateLabel()
         local text = Drawing.new("Text")
         text.Center = true
         text.Outline = true
@@ -1600,42 +1386,52 @@ task.spawn(function()
         return text
     end
 
-    -- Limpieza de seguridad
-    local function RemoveLabel(player)
-        if Labels[player] then
-            Labels[player]:Remove()
-            Labels[player] = nil
+    local function Z_RemoveLabel(player)
+        if Z_TeamLabels[player] then
+            Z_TeamLabels[player]:Remove()
+            Z_TeamLabels[player] = nil
         end
     end
 
-    Players.PlayerRemoving:Connect(RemoveLabel)
+    Players.PlayerRemoving:Connect(Z_RemoveLabel)
 
     -- [[ LOOP MAESTRO DE RENDERIZADO ]]
     RunService.RenderStepped:Connect(function()
+        local mySide = Z_GetTeamSide(LP)
+
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LP then
                 local char = player.Character
                 local head = char and char:FindFirstChild("Head")
-                local hum = char and char:FindFirstChild("Humanoid")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-                -- Si el ESP está activo y el wey está vivo/cerca
-                if _G.ESP_Team_Enabled and char and head and hum and hum.Health > 0 then
-                    if not Labels[player] then Labels[player] = CreateLabel() end
-                    local label = Labels[player]
+                -- 1. VALIDACIÓN BÁSICA
+                if _G.Z_ESP_TeamNames_Enabled and char and head and hum and hum.Health > 0 then
+                    
+                    -- 2. 🤖 SMART TEAM CHECK (FULANITO 5)
+                    if _G.Z_ESP_TeamNames_SmartCheck then
+                        local targetSide = Z_GetTeamSide(player)
+                        if mySide == targetSide and mySide ~= "Neutral" then
+                            if Z_TeamLabels[player] then Z_TeamLabels[player].Visible = false end
+                            continue
+                        end
+                    end
 
-                    -- Posición: 2.5 studs arriba de la cabeza (Anclado)
+                    if not Z_TeamLabels[player] then Z_TeamLabels[player] = Z_CreateLabel() end
+                    local label = Z_TeamLabels[player]
+
+                    -- Posición y Distancia
                     local pos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 2.5, 0))
                     local dist = (Camera.CFrame.Position - head.Position).Magnitude
 
-                    if onScreen and dist < _G.ESP_Team_MaxDist then
-                        local healthPercent = hum.Health / hum.MaxHealth
-                        -- El color cambia de Verde a Rojo según la vida
-                        local colorHP = Color3.fromHSV(healthPercent * 0.3, 1, 1)
+                    if onScreen and dist < _G.Z_ESP_TeamNames_MaxDist then
+                        local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        local colorHP = Color3.fromHSV(healthPercent * 0.3, 1, 1) -- Verde a Rojo
                         
                         label.Text = "[" .. (player.Team and player.Team.Name or "Civilian") .. "]"
                         label.Position = Vector2.new(pos.X, pos.Y)
                         
-                        -- Escalado de texto pro (se hace chiquito a la distancia)
+                        -- Escalado de texto (se hace chiquito a la distancia)
                         label.Size = math.clamp(18 - (dist/40), 11, 18)
                         label.Color = colorHP
                         label.Visible = true
@@ -1643,10 +1439,7 @@ task.spawn(function()
                         label.Visible = false
                     end
                 else
-                    -- Si no cumple, escondemos el label
-                    if Labels[player] then
-                        Labels[player].Visible = false
-                    end
+                    if Z_TeamLabels[player] then Z_TeamLabels[player].Visible = false end
                 end
             end
         end
