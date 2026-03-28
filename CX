@@ -1489,8 +1489,8 @@ local HitTab = Window:Tab({
 })
 
 local FarmTab = Window:Tab({ 
-    Title = "Others", 
-    Icon = "solar:global-linear" 
+    Title = "Auto Farm", 
+    Icon = "solar:case-round-bold" 
 })
 
 Window:Divider()
@@ -1791,11 +1791,6 @@ CombatTab:Dropdown({
 -- // ⚙️ VARIABLES INICIALES (AUTO FARM TRUE FIX) // --
 _G.Z_Farm_Active = false
 
-local FarmTab = Window:Tab({ 
-    Title = "Auto Farm", 
-    Icon = "solar:case-round-bold" 
-})
-
 FarmTab:Section({ Title = "Ruta de Contrabando (True Fix)" })
 
 -- 🚜 BOTÓN MAESTRO (MODO DIOS)
@@ -1849,40 +1844,63 @@ FarmTab:Paragraph({
 
 
 
+-- // ⚙️ VARIABLES INICIALES (VISUALS) // --
+_G.Z_ESP_Master = false
+_G.Z_ESP_Boxes = true
+_G.Z_ESP_HealthBar = true
+_G.Z_ESP_Color = Color3.fromRGB(0, 255, 0) -- Color inicial: Verde Neon
 
--- Variables iniciales para el ESP
-_G.ESP_Boxes = false
-_G.ESP_Color = "Red" -- Color por defecto
+VisualsTab:Section({ Title = "ESP 2D | v1" })
 
-RenderTab:Section({ Title = "Configuración de ESP" })
+-- 👁️ MASTER TOGGLE (PRENDE/APAGA TODO EL MOTOR)
+VisualsTab:Toggle({
+    Title = "Esp 2D",
+    Desc = "Enciende el motor de renderizado de jugadores.",
+    Value = _G.Z_ESP_Master,
+    Callback = function(state) 
+        _G.Z_ESP_Master = state 
+    end
+})
 
-RenderTab:Toggle({
-    Title = "ESP: 2D Box + Health",
-    Desc = "Muestra las cajas y barras de vida.",
-    Value = _G.ESP_Boxes,
-    Callback = function(state)
-        _G.ESP_Boxes = state
+-- // 🛡️ TOGGLE: TEAM CHECK (FILTRO PARA CAJAS) // --
+VisualsTab:Toggle({
+    Title = "Team Check",
+    Desc = "Oculta el Esp de tus aliados.",
+    Value = _G.Z_ESP_TeamCheck,
+    Callback = function(state) 
+        _G.Z_ESP_TeamCheck = state 
+        
+        -- Notificación visual rápida
         WindUI:Notify({
-            Title = "Z-SQUAD LITE",
-            Content = state and "ESP: Activado" or "ESP: Desactivado",
-            Time = 2
+            Title = "Z'Espv1",
+            Content = state and "On" or "Off",
+            Time = 1.5
         })
     end
 })
 
--- Lista para elegir el color de las cajas
-RenderTab:Dropdown({
-    Title = "Color del Box",
-    Desc = "Selecciona el color de las cajas 2D.",
-    Values = { "Red", "Green", "Blue", "Rainbow" },
-    Value = "Red",
-    Callback = function(option)
-        _G.ESP_Color = option
-        WindUI:Notify({
-            Title = "Z-SQUAD",
-            Content = "Color ESP: " .. option,
-            Time = 2
-        })
+-- 📦 TOGGLE: CAJAS
+VisualsTab:Toggle({
+    Title = "Box",
+    Desc = "Dibuja un Cuadro alrededor del jugador.",
+    Value = _G.Z_ESP_Boxes,
+    Callback = function(state) _G.Z_ESP_Boxes = state end
+})
+
+-- 🏥 TOGGLE: BARRA DE VIDA
+VisualsTab:Toggle({
+    Title = "HP",
+    Desc = "Añade una barra lateral con vida del enemigo.",
+    Value = _G.Z_ESP_HealthBar,
+    Callback = function(state) _G.Z_ESP_HealthBar = state end
+})
+
+-- 🎨 COLORPICKER (EL QUE MANDA EL COLOR A LA CAJA)
+VisualsTab:Colorpicker({
+    Title = "Color Esp 2D",
+    Default = _G.Z_ESP_Color,
+    Callback = function(color) 
+        _G.Z_ESP_Color = color
     end
 })
 
@@ -1901,48 +1919,71 @@ RenderTab:Dropdown({
 
 
 
+-- // ⚙️ VARIABLES INICIALES (TRACERS UPDATE) // --
+_G.Z_Tracers_Enabled = false
+_G.Z_Tracer_Origin = "Abajo"
+_G.Z_Tracer_Color = Color3.fromRGB(0, 255, 0)
+_G.Z_Tracer_Width = 1 -- Ancho por defecto
+_G.Z_Tracer_Transparency = 0.5 -- Transparencia por defecto (0 es sólido, 1 invisible)
 
+VisualsTab:Section({ Title = "Esp Tracers | esp v2" })
 
-
-
-
-
-
-
-
-
-RenderTab:Section({ Title = "Configuración de Tracers" })
-
--- 1. Toggle Principal
-RenderTab:Toggle({
-    Title = "ESP: Tracers 360°",
+-- ⚡ TOGGLE TRACERS
+VisualsTab:Toggle({
+    Title = "Esp Tracers",
     Desc = "Dibuja líneas hacia los enemigos.",
-    Value = _G.TracersEnabled,
-    Callback = function(state)
-        _G.TracersEnabled = state
+    Value = _G.Z_Tracers_Enabled,
+    Callback = function(state) _G.Z_Tracers_Enabled = state end
+})
+
+-- // 🛡️ TOGGLE: TEAM CHECK (SMART FILTER) // --
+VisualsTab:Toggle({
+    Title = "Team Check",
+    Desc = "Oculta el Esp de tus aliados.",
+    Value = _G.Z_Tracer_TeamCheck,
+    Callback = function(state) 
+        _G.Z_Tracer_TeamCheck = state 
+        
+        -- Notificación rápida para confirmar el cambio
+        WindUI:Notify({
+            Title = "Z'v2",
+            Content = state and "On" or "Off",
+            Time = 1.5
+        })
     end
 })
 
--- 2. Lista de Origen (Arriba, Abajo, Centro)
-RenderTab:Dropdown({
-    Title = "Origen del Tracer",
-    Desc = "¿De dónde sale la línea?",
+-- 📏 SLIDER: ANCHO DE LÍNEA
+VisualsTab:Slider({
+    Title = "Grosor",
+    Desc = "Grosor de el tracer (Recomendado: 1.5)",
+    Step = 1,
+    Value = { Min = 1, Max = 5, Default = 1.5 },
+    Callback = function(val) _G.Z_Tracer_Width = val end
+})
+
+-- 👻 SLIDER: TRANSPARENCIA
+VisualsTab:Slider({
+    Title = "Transparencia",
+    Desc = "1: Sólido | 100: Invisible.",
+    Step = 1,
+    Value = { Min = 1, Max = 100, Default = 50 },
+    Callback = function(val) _G.Z_Tracer_Transparency = val / 100 end
+})
+
+-- 📍 ORIGEN DE LÍNEA
+VisualsTab:Dropdown({
+    Title = "ubicacion del Esp Tracer",
     Values = { "Arriba", "Centro", "Abajo" },
     Value = "Abajo",
-    Callback = function(option)
-        _G.TracerOrigin = option
-    end
+    Callback = function(option) _G.Z_Tracer_Origin = option end
 })
 
--- 3. Lista de Colores
-RenderTab:Dropdown({
-    Title = "Color del Tracer",
-    Desc = "Selecciona el estilo visual.",
-    Values = { "Red", "Green", "Blue", "Rainbow" },
-    Value = "Red",
-    Callback = function(option)
-        _G.TracerColor = option
-    end
+-- 🎨 COLORPICKER TRACER
+VisualsTab:Colorpicker({
+    Title = "Color Tracer",
+    Default = _G.Z_Tracer_Color,
+    Callback = function(color) _G.Z_Tracer_Color = color end
 })
 
 
@@ -1964,87 +2005,146 @@ RenderTab:Dropdown({
 
 
 
+-- // ⚙️ VARIABLES INICIALES (ESP 3D SIMPLIFICADO) // --
+_G.Z_ESP3D_Enabled = false
+_G.Z_ESP3D_Color = Color3.fromRGB(255, 0, 0)
+_G.Z_ESP3D_TeamCheck = false
+
+VisualsTab:Section({ Title = "ESP 3D | v3" })
+
+-- 🧊 MASTER TOGGLE 3D
+VisualsTab:Toggle({
+    Title = "Esp 3D",
+    Desc = "Dibuja una caja 3D.",
+    Value = _G.Z_ESP3D_Enabled,
+    Callback = function(state) _G.Z_ESP3D_Enabled = state end
+})
+
+-- 🎨 COLORPICKER 3D
+VisualsTab:Colorpicker({
+    Title = "Color Esp 3D",
+    Desc = "Elige el color del Esp 3D.",
+    Default = _G.Z_ESP3D_Color,
+    Callback = function(color) _G.Z_ESP3D_Color = color end
+})
+
+-- 🛡️ SMART TEAM CHECK (FULANITO 3)
+VisualsTab:Toggle({
+    Title = "Team Check",
+    Desc = "Oculta el Esp de tus aliados.",
+    Value = _G.Z_ESP3D_TeamCheck,
+    Callback = function(state) 
+        _G.Z_ESP3D_TeamCheck = state 
+        WindUI:Notify({ Title = "Z'v3", Content = " Esp 3D Team-Check: " .. (state and "On" or "Off"), Time = 1.5 })
+    end
+})
 
 
-RenderTab:Section({ Title = "ESP 3D Pro (Drawing)" })
 
--- Toggle para prender y apagar
-RenderTab:Toggle({
-    Title = "Activar ESP 3D",
-    Desc = "Dibuja las 12 líneas del cubo sobre los enemigos.",
-    Value = _G.ESP3D_Enabled,
-    Callback = function(state)
-        _G.ESP3D_Enabled = state
-        
-        WindUI:Notify({
-            Title = "Z-Noreste",
-            Content = state and "ESP 3D: Activado" or "ESP 3D: Desactivado",
-            Time = 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- // ⚙️ VARIABLES INICIALES (SKELETON CONFIG) // --
+_G.Z_Skeleton_Enabled = false
+_G.Z_Skeleton_Color = Color3.fromRGB(0, 255, 0) -- Verde Neon por defecto
+_G.Z_Skeleton_TeamCheck = false
+
+VisualsTab:Section({ Title = "Esp Skeleton | v4" })
+
+-- 💀 MASTER TOGGLE SKELETON
+VisualsTab:Toggle({
+    Title = "Esp Skeleton",
+    Desc = "Esp de los huesos de los enemigos.",
+    Value = _G.Z_Skeleton_Enabled,
+    Callback = function(state) _G.Z_Skeleton_Enabled = state end
+})
+
+-- 🎨 COLORPICKER SKELETON
+VisualsTab:Colorpicker({
+    Title = "Color Esp Skeleton",
+    Desc = "Elige el color para el Esp Skeleton",
+    Default = _G.Z_Skeleton_Color,
+    Callback = function(color) _G.Z_Skeleton_Color = color end
+})
+
+-- 🛡️ SMART TEAM CHECK (FULANITO 4)
+VisualsTab:Toggle({
+    Title = "Team Check",
+    Desc = "Oculta el Esp de tus aliados.",
+    Value = _G.Z_Skeleton_TeamCheck,
+    Callback = function(state) 
+        _G.Z_Skeleton_TeamCheck = state 
+        WindUI:Notify({ 
+            Title = "Z'v6", 
+            Content = "Esp Skeleton Team-Check: " .. (state and "ON" or "OFF"), 
+            Time = 1.5 
         })
     end
 })
 
--- Lista de Colores (La que pediste: Rojo, Verde, Azul, Rainbow)
-RenderTab:Dropdown({
-    Title = "Color del ESP 3D",
-    Desc = "Selecciona el estilo de las líneas.",
-    Values = { "Red", "Green", "Blue", "Rainbow" },
-    Value = "Red",
-    Callback = function(option)
-        _G.ESP3D_Color = option
-    end
+
+
+
+
+
+
+
+
+
+
+
+-- // ⚙️ VARIABLES INICIALES (TEAM NAMES CONFIG) // --
+_G.Z_ESP_TeamNames_Enabled = false
+_G.Z_ESP_TeamNames_SmartCheck = false
+_G.Z_ESP_TeamNames_MaxDist = 600
+
+VisualsTab:Section({ Title = "Esp Roles | v5" })
+
+-- 🏷️ MASTER TOGGLE: NOMBRES DE EQUIPO
+VisualsTab:Toggle({
+    Title = "Esp Roles",
+    Desc = "Muestra el equipo del jugador arriba.",
+    Value = _G.Z_ESP_TeamNames_Enabled,
+    Callback = function(state) _G.Z_ESP_TeamNames_Enabled = state end
 })
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-RenderTab:Section({ Title = "ESP Skeleton (Bones)" })
-
--- 1. Toggle Principal
-RenderTab:Toggle({
-    Title = "ESP: Skeleton v1",
-    Desc = "Dibuja los huesos de los enemigos (R6/R15).",
-    Value = _G.Skeleton_Enabled,
-    Callback = function(state)
-        _G.Skeleton_Enabled = state
-        WindUI:Notify({
-            Title = "Z-SQUAD",
-            Content = state and "Skeleton: Activado" or "Skeleton: Desactivado",
-            Time = 2
+-- 🛡️ SMART TEAM CHECK (FULANITO 5)
+VisualsTab:Toggle({
+    Title = "Team Check",
+    Desc = "Oculta el Esp de tus aliados..",
+    Value = _G.Z_ESP_TeamNames_SmartCheck,
+    Callback = function(state) 
+        _G.Z_ESP_TeamNames_SmartCheck = state 
+        WindUI:Notify({ 
+            Title = "Z'v5", 
+            Content = "Esp Roles: Team-Check: " .. (state and "On" or "Off"), 
+            Time = 1.5 
         })
     end
 })
 
--- 2. Dropdown de Colores
-RenderTab:Dropdown({
-    Title = "Color del Skeleton",
-    Desc = "Selecciona el color de los huesos.",
-    Values = { "Red", "Green", "Blue", "Rainbow" },
-    Value = "Red",
-    Callback = function(option)
-        _G.Skeleton_Color = option
-    end
+-- 📏 SLIDER: DISTANCIA MÁXIMA
+VisualsTab:Slider({
+    Title = "Distancia",
+    Desc = "Ajusta qué tan lejos verás los Roles.",
+    Step = 10,
+    Value = { Min = 100, Max = 2000, Default = 600 },
+    Callback = function(val) _G.Z_ESP_TeamNames_MaxDist = val end
 })
 
 
@@ -2066,122 +2166,23 @@ RenderTab:Dropdown({
 
 
 
-
-
-
-RenderTab:Section({ Title = "Configuración ESP Heigle" })
-
--- 1. Interruptor Principal
-RenderTab:Toggle({
-    Title = "Activar ESP Heigle",
-    Value = _G.ESP_High_Enabled,
-    Callback = function(state)
-        _G.ESP_High_Enabled = state
-    end
+local Paragraph = VisualsTab:Paragraph({
+    Title = "Categoria Visuals. Mas de 4 Esp Utiles",
+    Desc = "Script beta v1.2",
+    Color = "Red",
+    Image = "",
+    ImageSize = 30,
+    Thumbnail = "",
+    ThumbnailSize = 80,
+    Locked = false,
+    Buttons = {
+        {
+            Icon = "bird",
+            Title = "Gracias por usarlo!!",
+            Callback = function() print("The final") end,
+        }
+    }
 })
-
--- 2. Modo Bordes (Input de Texto)
-RenderTab:Input({
-    Title = "Modo Bordes (1 o 2)",
-    Desc = "1: Sin Bordes | 2: Con Bordes",
-    Default = "2",
-    Placeholder = "Escribe 1 o 2...",
-    Callback = function(val)
-        local num = tonumber(val)
-        if num == 1 then
-            _G.ESP_High_Outline = 1 -- Totalmente transparente (sin borde)
-        elseif num == 2 then
-            _G.ESP_High_Outline = 0 -- Sólido (con borde)
-        end
-    end
-})
-
--- 3. Modo Relleno (Input de Texto)
-RenderTab:Input({
-    Title = "Modo Relleno (1, 2, 3)",
-    Desc = "1: Sólido | 2: 0.5 Trans | 3: Invisible",
-    Default = "2",
-    Placeholder = "Escribe 1, 2 o 3...",
-    Callback = function(val)
-        local num = tonumber(val)
-        if num == 1 then
-            _G.ESP_High_Fill = 0   -- Sólido
-        elseif num == 2 then
-            _G.ESP_High_Fill = 0.5 -- Transparente
-        elseif num == 3 then
-            _G.ESP_High_Fill = 1   -- Invisible
-        end
-    end
-})
-
--- 4. Lista de Colores
-RenderTab:Dropdown({
-    Title = "Color del Heigle",
-    Values = { "Red", "Green", "Blue", "Rainbow" },
-    Value = "Red",
-    Callback = function(option)
-        _G.ESP_High_Color = option
-    end
-})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-RenderTab:Section({ Title = "ESP: Roles & Team" })
-
--- 1. Toggle Principal
-RenderTab:Toggle({
-    Title = "Activar Team ESP",
-    Desc = "Muestra el equipo y vida arriba de la cabeza.",
-    Value = _G.ESP_Team_Enabled,
-    Callback = function(state)
-        _G.ESP_Team_Enabled = state
-    end
-})
-
--- 2. Input de Distancia (REEMPLAZA AL SLIDER WE)
-RenderTab:Input({
-    Title = "Distancia de Render",
-    Desc = "Escribe el número (Ej: 600, 1000, 2000)",
-    Default = "600",
-    Placeholder = "Escribe la distancia...",
-    Callback = function(val)
-        local num = tonumber(val)
-        if num then
-            _G.ESP_Team_MaxDist = num
-            WindUI:Notify({
-                Title = "Z-SQUAD",
-                Content = "Distancia fijada en: " .. num,
-                Time = 2
-            })
-        end
-    end
-})
-
-
-
-
 
 
 
