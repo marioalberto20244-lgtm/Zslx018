@@ -1478,7 +1478,7 @@ local CombatTab = Window:Tab({
     Icon = "solar:crown-star-bold" 
 })
 
-local RenderTab = Window:Tab({ 
+local VisualsTab = Window:Tab({ 
     Title = "Esp", 
     Icon = "solar:eye-bold" 
 })
