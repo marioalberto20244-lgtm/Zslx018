@@ -1860,10 +1860,10 @@ _G.Z_Aimbot_TeamCheck = true -- Ahora es automático inteligente
 _G.Z_Aimbot_ShowFOV = true
 _G.Z_FOV_Shape = "Circulo"
 
-CombatTab:Section({ Title = "Aimbot Auto-Inteligente CSC" })
+CombatTab:Section({ Title = "Aimbot | Fix" })
 
 CombatTab:Toggle({
-    Title = "Activar Aimbot",
+    Title = "Aimbot",
     Desc = "Apunta solo a tus enemigos reales.",
     Value = _G.Z_Aimbot_Active,
     Callback = function(state) _G.Z_Aimbot_Active = state end
@@ -1988,10 +1988,10 @@ _G.Z_GunMods_Burst = true
 _G.Z_GunMods_InfAmmo = true
 _G.Z_GunMods_NoRecoil = true
 
-CombatTab:Section({ Title = "Armas ACS / Hi-Point (Zero Lag)" })
+CombatTab:Section({ Title = "Armas | Inf balas |" })
 
 CombatTab:Toggle({
-    Title = "Activar Gun Mods",
+    Title = "",
     Desc = "Aplica los hacks al instante desde el inventario.",
     Value = _G.Z_GunMods_Active,
     Callback = function(state) 
