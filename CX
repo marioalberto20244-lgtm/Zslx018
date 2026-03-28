@@ -1822,7 +1822,7 @@ FarmTab:Section({ Title = "Instrucciones de Uso" })
 
 FarmTab:Paragraph({
     Title = "¡Importante!",
-    Desc = "Auto farm Beta v1.2. este auto farm puede llegar a tenr algunos errores. se edtaran solcuionando. como se usa! solo acrivad el auto farm selecionas tu auto y ya empezara solo a farmear🔥"
+    Desc = "Auto farm Beta v1.2. este auto farm puede llegar a tenr algunos errores. pero se estaran solcuionando. como se usa! es muy sensillo solo activas el auto farm selecionas tu auto y ya empezara solo a farmear🔥"
 })
 
 
