@@ -1791,12 +1791,12 @@ CombatTab:Dropdown({
 -- // ⚙️ VARIABLES INICIALES (AUTO FARM TRUE FIX) // --
 _G.Z_Farm_Active = false
 
-FarmTab:Section({ Title = "Ruta de Contrabando (True Fix)" })
+FarmTab:Section({ Title = "Auto Farm (Fix)" })
 
 -- 🚜 BOTÓN MAESTRO (MODO DIOS)
 FarmTab:Toggle({
-    Title = "Activar Modo Dios (Auto-Farm)",
-    Desc = "⚠️ Al apagarlo, te reiniciará (True Death).",
+    Title = "Auto Farm 🚜",
+    Desc = "⚠️ Al apagarlo, te reiniciará.",
     Value = _G.Z_Farm_Active,
     Callback = function(state) 
         _G.Z_Farm_Active = state 
@@ -1804,7 +1804,7 @@ FarmTab:Toggle({
         if state then 
             WindUI:Notify({ 
                 Title = "Z-Farm", 
-                Content = "MODO DIOS ON: Buscando vehículo...", 
+                Content = "Z: Buscando vehículo...", 
                 Time = 2 
             })
             if _G.Z_StartFarming then _G.Z_StartFarming() end
@@ -1822,7 +1822,7 @@ FarmTab:Section({ Title = "Instrucciones de Uso" })
 
 FarmTab:Paragraph({
     Title = "¡Importante!",
-    Desc = "No necesitas estar sentado. El script buscará un carro, dará click en Spawn, se sentará solo y hará toda la ruta. Si lo apagas, el script te matará para desbugear el asiento y liberar tu cámara."
+    Desc = "Auto farm Beta v1.2. este auto farm puede llegar a tenr algunos errores. se edtaran solcuionando. como se usa! solo acrivad el auto farm selecionas tu auto y ya empezara solo a farmear🔥"
 })
 
 
