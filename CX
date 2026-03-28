@@ -1987,7 +1987,7 @@ _G.Z_GunMods_InfAmmo = false
 _G.Z_GunMods_Burst = false
 _G.Z_GunMods_NoRecoil = false
 
-CombatTab:Section({ Title = "Configuración de Armas (ACS)" })
+CombatTab:Section({ Title = "Others Options (ACS)" })
 
 -- 🔵 BOTÓN 1: COMBO (RAPID FIRE + INF BALAS)
 local ComboBtn = CombatTab:Button({
@@ -2004,7 +2004,7 @@ local ComboBtn = CombatTab:Button({
         if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
-ComboBtn:SetDesc("Activa ráfaga/auto y balas infinitas al mismo tiempo.")
+ComboBtn:SetDesc("Balas Inf + Rapid fire. Dispara sin limites + Aumenta un 25% la velocidad de disparo.")
 CombatTab:Space()
 
 -- 🔵 BOTÓN 2: NO RECOIL
@@ -2021,7 +2021,7 @@ local RecoilBtn = CombatTab:Button({
         if _G.Z_ForceGunScan then _G.Z_ForceGunScan() end
     end
 })
-RecoilBtn:SetDesc("Elimina el retroceso y la dispersión (Láser).")
+RecoilBtn:SetDesc("norecoil. elimina el retroceso y la dispercion de balas.")
 CombatTab:Space()
 
 
