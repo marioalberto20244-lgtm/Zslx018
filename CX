@@ -1573,9 +1573,7 @@ end)
 
 
 
-
-
--- // ⚙️ VARIABLES DE CONTROL (VOID FIX) // --
+-- // ⚙️ VARIABLES DE CONTROL (PRONE & VOID FIX) // --
 local WasDennis = false
 local DennisCFrame = nil
 local GhostPos = Vector3.new(0, 0, 0)
@@ -1584,16 +1582,17 @@ local CamAnchor = nil
 
 local function GetCamAnchor()
     if not CamAnchor then
-        CamAnchor = Instance.new("Part", workspace)
+        CamAnchor = Instance.new("Part")
         CamAnchor.Name = "Z_Ghost_Anchor"
         CamAnchor.Transparency = 1
         CamAnchor.CanCollide = false
         CamAnchor.Anchored = true
+        CamAnchor.Parent = workspace
     end
     return CamAnchor
 end
 
--- // 🔄 MOTOR MODO DENNIS (GHOST ASSASSIN SAFE-EXIT) // --
+-- // 🔄 MOTOR MODO DENNIS (PRONE UNDERGROUND) // --
 task.spawn(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
@@ -1611,7 +1610,7 @@ task.spawn(function()
                 DennisCFrame = HRP.CFrame
                 GhostPos = Vector3.new(0, 0, 0)
                 
-                -- CLON SEÑUELO
+                -- CLON SEÑUELO (Este se queda parado normal arriba)
                 Char.Archivable = true
                 FakeClone = Char:Clone()
                 FakeClone.Name = "Z_Dennis_Decoy"
@@ -1623,7 +1622,7 @@ task.spawn(function()
                 FakeClone:PivotTo(DennisCFrame)
             end
 
-            -- 🏃 MOVIMIENTO
+            -- 🏃 MOVIMIENTO VIRTUAL
             local moveDir = Hum.MoveDirection
             GhostPos = GhostPos + (moveDir * (Hum.WalkSpeed * 0.016)) 
 
@@ -1633,36 +1632,40 @@ task.spawn(function()
             anchor.Position = surfacePos.Position + Vector3.new(0, 2, 0)
             Camera.CameraSubject = anchor
 
-            -- 🎯 EL TRUCO (8 Studs Abajo)
-            HRP.CFrame = surfacePos * CFrame.new(0, -10, 0) 
+            -- 🎯 EL TRUCO: Enterrado -8 studs y ACOSTADO (-90 grados)
+            -- Multiplicamos por CFrame.Angles para rotar el cuerpo
+            HRP.CFrame = (surfacePos * CFrame.new(0, -8, 0)) * CFrame.Angles(math.rad(-90), 0, 0)
             HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
-            -- 👻 INVISIBILIDAD
+            -- 👻 INVISIBILIDAD Y SEGURIDAD
             for _, part in pairs(Char:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false 
                     part.LocalTransparencyModifier = 1 
                 end
             end
+            -- Forzamos que no se intente parar
+            Hum.PlatformStand = true 
         else
             -- 🔙 REGRESO SEGURO (ANTI-VACÍO)
             if WasDennis then
                 WasDennis = false
-                if Hum then Camera.CameraSubject = Hum end
+                if Hum then 
+                    Hum.PlatformStand = false -- Ya puede pararse
+                    Camera.CameraSubject = Hum 
+                end
                 
                 if HRP and DennisCFrame then
                     local targetPos = DennisCFrame + GhostPos
                     
-                    -- 🔍 ESCÁNER DE SUELO (Raycast)
+                    -- Raycast para no aparecer enterrado al salir
                     local rayOrigin = targetPos.Position + Vector3.new(0, 10, 0)
                     local rayDir = Vector3.new(0, -20, 0)
                     local raycastResult = workspace:Raycast(rayOrigin, rayDir)
 
                     if raycastResult then
-                        -- Te dejamos 3 studs arriba del suelo que encontramos
                         HRP.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0))
                     else
-                        -- Si no hay suelo (estás en la orilla), te dejamos a la altura original
                         HRP.CFrame = targetPos + Vector3.new(0, 3, 0)
                     end
                 end
@@ -1680,7 +1683,6 @@ task.spawn(function()
         end
     end)
 end)
-
 
 
 
